@@ -30,7 +30,10 @@ def main():
 @click.option('--header-name',
               default='picomsg_generated',
               help='Name for generated header files (C only)')
-def compile(schema_file: Path, lang: str, output: Path, header_name: str):
+@click.option('--structs-only',
+              is_flag=True,
+              help='Generate only struct definitions without error enums and serialization functions (C only)')
+def compile(schema_file: Path, lang: str, output: Path, header_name: str, structs_only: bool):
     """Compile a PicoMsg schema file to target language bindings."""
     try:
         # Parse schema
@@ -47,6 +50,10 @@ def compile(schema_file: Path, lang: str, output: Path, header_name: str):
         if lang == 'c':
             generator = CCodeGenerator(schema)
             generator.set_option('header_name', header_name)
+            generator.set_option('structs_only', structs_only)
+            
+            if structs_only:
+                click.echo("Mode: Structs only (no error enums or serialization functions)")
         else:
             raise click.ClickException(f"Language '{lang}' not yet implemented")
         
@@ -73,6 +80,8 @@ def validate(schema_file: Path):
         click.echo(f"✓ Schema file is valid: {schema_file}")
         if schema.namespace:
             click.echo(f"  Namespace: {schema.namespace.name}")
+        if schema.version is not None:
+            click.echo(f"  Version: {schema.version}")
         click.echo(f"  Structs: {len(schema.structs)}")
         click.echo(f"  Messages: {len(schema.messages)}")
         
@@ -104,6 +113,11 @@ def info(schema_file: Path):
         
         if schema.namespace:
             click.echo(f"Namespace: {schema.namespace.name}")
+        
+        if schema.version is not None:
+            click.echo(f"Version: {schema.version}")
+        
+        if schema.namespace or schema.version is not None:
             click.echo()
         
         if schema.structs:

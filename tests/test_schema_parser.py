@@ -410,9 +410,112 @@ class TestSchemaParser:
     def test_parse_empty_message(self):
         """Test parsing empty message."""
         schema_text = """
-        message Empty {
+        message EmptyMessage {
         }
         """
-        schema = self.parser.parse_string(schema_text)
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_text)
+        
         assert len(schema.messages) == 1
-        assert len(schema.messages[0].fields) == 0 
+        message = schema.messages[0]
+        assert message.name == "EmptyMessage"
+        assert len(message.fields) == 0
+
+    def test_parse_version_declaration(self):
+        """Test parsing version declaration."""
+        schema_text = """
+        version 5;
+        namespace test;
+        
+        struct Point {
+            x: f32;
+            y: f32;
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_text)
+        
+        assert schema.version == 5
+        assert schema.namespace.name == "test"
+        assert len(schema.structs) == 1
+        assert schema.structs[0].name == "Point"
+
+    def test_parse_version_only(self):
+        """Test parsing schema with only version declaration."""
+        schema_text = "version 42;"
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_text)
+        
+        assert schema.version == 42
+        assert schema.namespace is None
+        assert len(schema.structs) == 0
+        assert len(schema.messages) == 0
+
+    def test_parse_version_with_namespace_order(self):
+        """Test parsing version and namespace in different orders."""
+        # Version first
+        schema_text1 = """
+        version 3;
+        namespace test.order;
+        """
+        
+        parser = SchemaParser()
+        schema1 = parser.parse_string(schema_text1)
+        assert schema1.version == 3
+        assert schema1.namespace.name == "test.order"
+        
+        # Namespace first
+        schema_text2 = """
+        namespace test.order;
+        version 3;
+        """
+        
+        schema2 = parser.parse_string(schema_text2)
+        assert schema2.version == 3
+        assert schema2.namespace.name == "test.order"
+
+    def test_parse_multiple_version_declarations_error(self):
+        """Test that multiple version declarations cause an error."""
+        schema_text = """
+        version 1;
+        version 2;
+        """
+        
+        parser = SchemaParser()
+        with pytest.raises(ValueError, match="Multiple version declarations not allowed"):
+            parser.parse_string(schema_text)
+
+    def test_parse_invalid_version_range(self):
+        """Test parsing invalid version numbers."""
+        parser = SchemaParser()
+        
+        # Test version 0 (invalid)
+        schema_text = "version 0;"
+        with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
+            parser.parse_string(schema_text)
+        
+        # Test version 256 (invalid)
+        schema_text = "version 256;"
+        with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
+            parser.parse_string(schema_text)
+
+    def test_parse_schema_without_version(self):
+        """Test parsing schema without version declaration."""
+        schema_text = """
+        namespace test;
+        
+        struct Point {
+            x: f32;
+            y: f32;
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_text)
+        
+        assert schema.version is None
+        assert schema.namespace.name == "test"
+        assert len(schema.structs) == 1 

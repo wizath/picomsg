@@ -21,16 +21,21 @@ class CCodeGenerator(CodeGenerator):
     def generate(self) -> Dict[str, str]:
         """Generate C header and implementation files."""
         header_name = self.get_option('header_name', 'picomsg_generated')
+        structs_only = self.get_option('structs_only', False)
         
         files = {}
         files[f"{header_name}.h"] = self._generate_header()
-        files[f"{header_name}.c"] = self._generate_implementation()
+        
+        # Only generate implementation file if not structs_only mode
+        if not structs_only:
+            files[f"{header_name}.c"] = self._generate_implementation()
         
         return files
     
     def _generate_header(self) -> str:
         """Generate C header file."""
         header_name = self.get_option('header_name', 'picomsg_generated')
+        structs_only = self.get_option('structs_only', False)
         guard_name = f"{header_name.upper()}_H"
         namespace_prefix = self._get_namespace_prefix()
         
@@ -48,9 +53,10 @@ class CCodeGenerator(CodeGenerator):
             "",
         ]
         
-        # Generate type definitions
-        lines.extend(self._generate_type_definitions())
-        lines.append("")
+        # Generate type definitions only if not structs_only mode
+        if not structs_only:
+            lines.extend(self._generate_type_definitions())
+            lines.append("")
         
         # Generate struct definitions
         for struct in self.schema.structs:
@@ -62,8 +68,9 @@ class CCodeGenerator(CodeGenerator):
             lines.extend(self._generate_message_definition(message))
             lines.append("")
         
-        # Generate function declarations
-        lines.extend(self._generate_function_declarations())
+        # Generate function declarations only if not structs_only mode
+        if not structs_only:
+            lines.extend(self._generate_function_declarations())
         
         lines.extend([
             "",
@@ -101,12 +108,13 @@ class CCodeGenerator(CodeGenerator):
     def _generate_type_definitions(self) -> List[str]:
         """Generate type definitions and constants."""
         namespace_prefix = self._get_namespace_prefix()
+        schema_version = self.schema.version if self.schema.version is not None else 1
         
         lines = [
             "// PicoMsg format constants",
             f"#define {namespace_prefix.upper()}MAGIC_BYTE_1 0xAB",
             f"#define {namespace_prefix.upper()}MAGIC_BYTE_2 0xCD",
-            f"#define {namespace_prefix.upper()}VERSION 1",
+            f"#define {namespace_prefix.upper()}VERSION {schema_version}",
             f"#define {namespace_prefix.upper()}HEADER_SIZE 8",
             "",
             "// Message type IDs",

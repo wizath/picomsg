@@ -19,10 +19,12 @@ PICOMSG_GRAMMAR = r"""
     start: item*
 
     item: namespace_decl
+        | version_decl
         | struct_decl
         | message_decl
 
     namespace_decl: "namespace" QUALIFIED_NAME ";"
+    version_decl: "version" NUMBER ";"
 
     struct_decl: "struct" NAME "{" field_decl* "}"
     message_decl: "message" NAME "{" field_decl* "}"
@@ -57,6 +59,7 @@ PICOMSG_GRAMMAR = r"""
 
     QUALIFIED_NAME: NAME ("." NAME)*
     NAME: /[a-zA-Z_][a-zA-Z0-9_]*/
+    NUMBER: /[0-9]+/
 
     %import common.WS
     %import common.CPP_COMMENT
@@ -73,6 +76,7 @@ class SchemaTransformer(Transformer):
     @v_args(inline=True)
     def start(self, *items):
         namespace = None
+        version = None
         structs = []
         messages = []
         
@@ -81,12 +85,16 @@ class SchemaTransformer(Transformer):
                 if namespace is not None:
                     raise ValueError("Multiple namespace declarations not allowed")
                 namespace = item
+            elif isinstance(item, int):  # Version number
+                if version is not None:
+                    raise ValueError("Multiple version declarations not allowed")
+                version = item
             elif isinstance(item, Struct):
                 structs.append(item)
             elif isinstance(item, Message):
                 messages.append(item)
         
-        return Schema(namespace=namespace, structs=structs, messages=messages)
+        return Schema(namespace=namespace, structs=structs, messages=messages, version=version)
 
     @v_args(inline=True)
     def item(self, content):
@@ -99,6 +107,10 @@ class SchemaTransformer(Transformer):
     @v_args(inline=True)
     def namespace_decl(self, name):
         return Namespace(name=str(name))
+
+    @v_args(inline=True)
+    def version_decl(self, version):
+        return int(version)
 
     @v_args(inline=True)
     def struct_decl(self, name, *fields):

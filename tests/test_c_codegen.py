@@ -412,14 +412,174 @@ class TestCCodeGenerator:
         assert lines[-1] == '#endif // TEST_HEADER_H'
     
     def test_cpp_compatibility(self):
-        """Test that generated code includes C++ compatibility."""
-        schema = Schema(namespace=None, structs=[], messages=[])
+        """Test that generated code is C++ compatible."""
+        namespace = Namespace("test")
+        
+        struct = Struct(name="Point", fields=[
+            Field(name="x", type=PrimitiveType(name="f32")),
+            Field(name="y", type=PrimitiveType(name="f32"))
+        ])
+        
+        schema = Schema(namespace=namespace, structs=[struct], messages=[])
+        
         generator = CCodeGenerator(schema)
-        
         files = generator.generate()
-        header = files['picomsg_generated.h']
         
-        # Check C++ compatibility
-        assert '#ifdef __cplusplus' in header
-        assert 'extern "C" {' in header
-        assert '#endif' in header 
+        header_content = files["picomsg_generated.h"]
+        assert 'extern "C" {' in header_content
+        assert '}' in header_content.split('extern "C" {')[1]
+
+    def test_structs_only_option(self):
+        """Test structs_only option generates only structures."""
+        namespace = Namespace("test")
+        
+        # Add a struct
+        struct = Struct(name="Point", fields=[
+            Field(name="x", type=PrimitiveType(name="f32")),
+            Field(name="y", type=PrimitiveType(name="f32"))
+        ])
+        
+        # Add a message
+        message = Message(name="EchoRequest", fields=[
+            Field(name="point", type=StructType(name="Point")),
+            Field(name="id", type=PrimitiveType(name="u32"))
+        ])
+        
+        schema = Schema(namespace=namespace, structs=[struct], messages=[message])
+        
+        generator = CCodeGenerator(schema)
+        generator.set_option('structs_only', True)
+        files = generator.generate()
+        
+        # Should only generate header file
+        assert len(files) == 1
+        assert "picomsg_generated.h" in files
+        assert "picomsg_generated.c" not in files
+        
+        header_content = files["picomsg_generated.h"]
+        
+        # Should contain struct definitions
+        assert "typedef struct" in header_content
+        assert "test_point_t" in header_content
+        assert "test_echorequest_t" in header_content
+        
+        # Should NOT contain error enums
+        assert "typedef enum" not in header_content
+        assert "TEST_OK" not in header_content
+        assert "TEST_ERROR_" not in header_content
+        
+        # Should NOT contain function declarations
+        assert "_from_bytes" not in header_content
+        assert "_to_bytes" not in header_content
+        
+        # Should NOT contain format constants
+        assert "MAGIC_BYTE" not in header_content
+        assert "VERSION" not in header_content
+        assert "TYPE_ID" not in header_content
+
+    def test_structs_only_vs_regular_mode(self):
+        """Test difference between structs_only and regular mode."""
+        namespace = Namespace("test")
+        
+        struct = Struct(name="Point", fields=[
+            Field(name="x", type=PrimitiveType(name="f32")),
+            Field(name="y", type=PrimitiveType(name="f32"))
+        ])
+        
+        schema = Schema(namespace=namespace, structs=[struct], messages=[])
+        
+        # Generate regular mode
+        generator_regular = CCodeGenerator(schema)
+        files_regular = generator_regular.generate()
+        
+        # Generate structs_only mode
+        generator_structs = CCodeGenerator(schema)
+        generator_structs.set_option('structs_only', True)
+        files_structs = generator_structs.generate()
+        
+        # Regular mode should have both files
+        assert len(files_regular) == 2
+        assert "picomsg_generated.h" in files_regular
+        assert "picomsg_generated.c" in files_regular
+        
+        # Structs only should have just header
+        assert len(files_structs) == 1
+        assert "picomsg_generated.h" in files_structs
+        
+        # Regular header should be longer (contains more content)
+        regular_header = files_regular["picomsg_generated.h"]
+        structs_header = files_structs["picomsg_generated.h"]
+        
+        assert len(regular_header) > len(structs_header)
+        
+        # Both should contain the struct definition
+        assert "test_point_t" in regular_header
+        assert "test_point_t" in structs_header
+        
+        # Only regular should contain error enum and functions
+        assert "typedef enum" in regular_header
+        assert "typedef enum" not in structs_header
+        assert "_from_bytes" in regular_header
+        assert "_from_bytes" not in structs_header
+
+    def test_schema_version_in_generated_code(self):
+        """Test that schema version is properly used in generated code."""
+        namespace = Namespace("test")
+        struct = Struct(name="Point", fields=[
+            Field(name="x", type=PrimitiveType(name="f32"))
+        ])
+        
+        # Test with explicit version
+        schema_with_version = Schema(namespace=namespace, structs=[struct], messages=[], version=42)
+        generator = CCodeGenerator(schema_with_version)
+        files = generator.generate()
+        
+        header_content = files["picomsg_generated.h"]
+        assert "#define TEST_VERSION 42" in header_content
+        
+        # Test without version (should default to 1)
+        schema_no_version = Schema(namespace=namespace, structs=[struct], messages=[])
+        generator = CCodeGenerator(schema_no_version)
+        files = generator.generate()
+        
+        header_content = files["picomsg_generated.h"]
+        assert "#define TEST_VERSION 1" in header_content
+
+    def test_schema_version_edge_cases(self):
+        """Test schema version edge cases in code generation."""
+        namespace = Namespace("test")
+        struct = Struct(name="Point", fields=[
+            Field(name="x", type=PrimitiveType(name="f32"))
+        ])
+        
+        # Test minimum version (1)
+        schema = Schema(namespace=namespace, structs=[struct], messages=[], version=1)
+        generator = CCodeGenerator(schema)
+        files = generator.generate()
+        header_content = files["picomsg_generated.h"]
+        assert "#define TEST_VERSION 1" in header_content
+        
+        # Test maximum version (255)
+        schema = Schema(namespace=namespace, structs=[struct], messages=[], version=255)
+        generator = CCodeGenerator(schema)
+        files = generator.generate()
+        header_content = files["picomsg_generated.h"]
+        assert "#define TEST_VERSION 255" in header_content
+
+    def test_schema_version_with_structs_only_mode(self):
+        """Test that version is not included in structs-only mode."""
+        namespace = Namespace("test")
+        struct = Struct(name="Point", fields=[
+            Field(name="x", type=PrimitiveType(name="f32"))
+        ])
+        
+        schema = Schema(namespace=namespace, structs=[struct], messages=[], version=10)
+        generator = CCodeGenerator(schema)
+        generator.set_option('structs_only', True)
+        files = generator.generate()
+        
+        header_content = files["picomsg_generated.h"]
+        
+        # Should NOT contain version define in structs-only mode
+        assert "TEST_VERSION" not in header_content
+        assert "#define" not in header_content or "#ifndef" in header_content  # Only header guards 

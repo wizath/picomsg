@@ -290,20 +290,59 @@ class TestSchema:
         assert not_found is None
     
     def test_schema_get_type_by_name(self):
-        """Test getting struct or message by name."""
-        struct = Struct(name='Point', fields=[
-            Field(name='x', type=PrimitiveType(name='f32')),
+        """Test getting types by name from schema."""
+        struct = Struct(name='TestStruct', fields=[
+            Field(name='field1', type=PrimitiveType(name='u32'))
         ])
         message = Message(name='TestMessage', fields=[
-            Field(name='id', type=PrimitiveType(name='u32')),
+            Field(name='field1', type=PrimitiveType(name='u32'))
         ])
         schema = Schema(namespace=None, structs=[struct], messages=[message])
         
-        found_struct = schema.get_type_by_name('Point')
-        assert found_struct == struct
+        # Test getting struct
+        result = schema.get_type_by_name('TestStruct')
+        assert result is not None
+        assert isinstance(result, Struct)
+        assert result.name == 'TestStruct'
         
-        found_message = schema.get_type_by_name('TestMessage')
-        assert found_message == message
+        # Test getting message
+        result = schema.get_type_by_name('TestMessage')
+        assert result is not None
+        assert isinstance(result, Message)
+        assert result.name == 'TestMessage'
         
-        not_found = schema.get_type_by_name('NotFound')
-        assert not_found is None 
+        # Test non-existent type
+        result = schema.get_type_by_name('NonExistent')
+        assert result is None
+
+    def test_schema_version_field(self):
+        """Test schema version field."""
+        # Test schema without version (should default to None)
+        schema = Schema(namespace=None, structs=[], messages=[])
+        assert schema.version is None
+        
+        # Test schema with valid version
+        schema = Schema(namespace=None, structs=[], messages=[], version=5)
+        assert schema.version == 5
+        
+        # Test schema with version 1 (minimum valid)
+        schema = Schema(namespace=None, structs=[], messages=[], version=1)
+        assert schema.version == 1
+        
+        # Test schema with version 255 (maximum valid)
+        schema = Schema(namespace=None, structs=[], messages=[], version=255)
+        assert schema.version == 255
+
+    def test_schema_version_validation(self):
+        """Test schema version validation."""
+        # Test invalid version 0
+        with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
+            Schema(namespace=None, structs=[], messages=[], version=0)
+        
+        # Test invalid version 256
+        with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
+            Schema(namespace=None, structs=[], messages=[], version=256)
+        
+        # Test invalid negative version
+        with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
+            Schema(namespace=None, structs=[], messages=[], version=-1) 

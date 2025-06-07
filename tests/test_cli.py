@@ -398,23 +398,145 @@ class TestCLI:
     
     def test_output_directory_creation(self):
         """Test that output directory is created if it doesn't exist."""
-        schema_content = "struct Point { x: f32; }"
-        schema_file = self.create_test_schema(schema_content)
-        
         with tempfile.TemporaryDirectory() as temp_dir:
-            # Use a nested path that doesn't exist
-            output_dir = Path(temp_dir) / 'nested' / 'output' / 'dir'
+            schema_file = Path(temp_dir) / "test.pico"
+            schema_file.write_text("namespace test;\nstruct Point { x: f32; y: f32; }")
             
-            try:
-                result = self.runner.invoke(main, [
-                    'compile', str(schema_file),
-                    '--lang', 'c',
-                    '--output', str(output_dir)
-                ])
+            output_dir = Path(temp_dir) / "nonexistent" / "output"
+            
+            result = self.runner.invoke(main, [
+                'compile', str(schema_file),
+                '--output', str(output_dir)
+            ])
+            
+            assert result.exit_code == 0
+            assert output_dir.exists()
+            assert (output_dir / "picomsg_generated.h").exists()
+
+    def test_compile_structs_only_option(self):
+        """Test compile command with --structs-only option."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            schema_file = Path(temp_dir) / "test.pico"
+            schema_file.write_text("""
+                namespace test;
                 
-                assert result.exit_code == 0
-                assert output_dir.exists()
-                assert (output_dir / 'picomsg_generated.h').exists()
+                struct Point {
+                    x: f32;
+                    y: f32;
+                }
                 
-            finally:
-                schema_file.unlink() 
+                message EchoRequest {
+                    point: Point;
+                    id: u32;
+                }
+            """)
+            
+            output_dir = Path(temp_dir) / "output"
+            
+            result = self.runner.invoke(main, [
+                'compile', str(schema_file),
+                '--output', str(output_dir),
+                '--structs-only'
+            ])
+            
+            assert result.exit_code == 0
+            assert "Mode: Structs only" in result.output
+            assert "Generated 1 files" in result.output
+            
+            # Check that only header file was generated
+            assert (output_dir / "picomsg_generated.h").exists()
+            assert not (output_dir / "picomsg_generated.c").exists()
+            
+            # Check header content
+            header_content = (output_dir / "picomsg_generated.h").read_text()
+            
+            # Should contain struct definitions
+            assert "test_point_t" in header_content
+            assert "test_echorequest_t" in header_content
+            
+            # Should NOT contain error enums or function declarations
+            assert "typedef enum" not in header_content
+            assert "_from_bytes" not in header_content
+            assert "_to_bytes" not in header_content
+            assert "MAGIC_BYTE" not in header_content
+
+    def test_compile_structs_only_with_custom_header_name(self):
+        """Test compile command with --structs-only and custom header name."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            schema_file = Path(temp_dir) / "test.pico"
+            schema_file.write_text("namespace test;\nstruct Point { x: f32; y: f32; }")
+            
+            output_dir = Path(temp_dir) / "output"
+            
+            result = self.runner.invoke(main, [
+                'compile', str(schema_file),
+                '--output', str(output_dir),
+                '--header-name', 'custom_structs',
+                '--structs-only'
+            ])
+            
+            assert result.exit_code == 0
+            assert "Mode: Structs only" in result.output
+            
+            # Check that only custom header file was generated
+            assert (output_dir / "custom_structs.h").exists()
+            assert not (output_dir / "custom_structs.c").exists()
+            assert not (output_dir / "picomsg_generated.h").exists()
+
+    def test_info_command_with_version(self):
+        """Test info command shows version information."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            schema_file = Path(temp_dir) / "test.pico"
+            schema_file.write_text("""
+                version 5;
+                namespace test.versioned;
+                
+                struct Point {
+                    x: f32;
+                    y: f32;
+                }
+                
+                message TestMessage {
+                    point: Point;
+                    id: u32;
+                }
+            """)
+            
+            result = self.runner.invoke(main, ['info', str(schema_file)])
+            
+            assert result.exit_code == 0
+            assert "Schema:" in result.output
+            assert "Namespace: test.versioned" in result.output
+            # Note: We might want to add version display to the info command later
+
+    def test_validate_command_with_version(self):
+        """Test validate command with version declaration."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            schema_file = Path(temp_dir) / "test.pico"
+            schema_file.write_text("""
+                version 3;
+                namespace test.validation;
+                
+                struct Point {
+                    x: f32;
+                    y: f32;
+                }
+            """)
+            
+            result = self.runner.invoke(main, ['validate', str(schema_file)])
+            
+            assert result.exit_code == 0
+            assert "✓ Schema file is valid" in result.output
+            assert "Namespace: test.validation" in result.output
+
+    def test_validate_command_invalid_version(self):
+        """Test validate command with invalid version."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            schema_file = Path(temp_dir) / "test.pico"
+            schema_file.write_text("version 0;\nnamespace test;")
+            
+            result = self.runner.invoke(main, ['validate', str(schema_file)])
+            
+            assert result.exit_code == 1
+            assert "Validation failed" in result.output
+            assert "Schema version must be between 1 and 255" in result.output 

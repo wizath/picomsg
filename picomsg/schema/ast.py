@@ -182,6 +182,7 @@ class Schema:
     namespace: Optional[Namespace]
     structs: List[Struct]
     messages: List[Message]
+    version: Optional[int] = None
     
     def __post_init__(self):
         # Check for duplicate struct names
@@ -198,6 +199,10 @@ class Schema:
         all_names = struct_names + message_names
         if len(all_names) != len(set(all_names)):
             raise ValueError("Conflicting struct and message names in schema")
+        
+        # Validate version if provided
+        if self.version is not None and (self.version < 1 or self.version > 255):
+            raise ValueError("Schema version must be between 1 and 255")
     
     def get_struct(self, name: str) -> Optional[Struct]:
         """Get a struct by name."""
