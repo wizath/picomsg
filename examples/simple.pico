@@ -1,0 +1,24 @@
+namespace test.simple;
+
+struct Point {
+    x: f32;
+    y: f32;
+}
+
+struct ApiHeader {
+    command: u8;
+    length: u16;
+    crc16: u16;
+}
+
+message EchoRequest {
+    header: ApiHeader;
+    point: Point;
+    id: u32;
+}
+
+message StatusResponse {
+    header: ApiHeader;
+    uptime: u32;
+    status: u8;
+} 
