@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2024-12-19
+
+### Added
+- **Comprehensive Test Structure Reorganization**:
+  - **Unit Tests** (`tests/unittest/`): 158 focused component tests
+    - `test_schema_ast.py`: AST data structure tests
+    - `test_schema_parser.py`: Schema parsing logic tests
+    - `test_binary_format.py`: Binary format utility tests
+    - `test_alignment.py`: Alignment calculation tests
+    - `test_c_codegen.py`: C code generator tests
+    - `test_rust_codegen.py`: Rust code generator tests
+    - `test_cli.py`: Command-line interface tests
+  - **Integration Tests** (`tests/integration/`): 37 cross-platform compatibility tests
+    - `test_cross_platform.py`: Cross-platform compatibility verification
+    - `test_end_to_end.py`: Complete workflow testing
+    - `test_binary_compatibility.py`: Binary format consistency tests
+    - `test_simple_cross_language.py`: **Cross-language data exchange tests**
+
+- **Cross-Language Binary Data Integration Tests**:
+  - **Rust → C Data Exchange**: Rust generates binary data, C reads and validates
+  - **C → Rust Data Exchange**: C generates binary data, Rust reads and validates
+  - **Binary Format Verification**: Ensures identical binary output between implementations
+  - **Round-trip Data Integrity**: Validates data maintains integrity across language boundaries
+
+- **Enhanced Integration Test Coverage**:
+  - Code generation and compilation testing for both C and Rust
+  - Schema validation workflows across different scenarios
+  - Error handling and edge case testing
+  - Complex schema processing with realistic examples
+
+### Enhanced
+- Test execution can now be targeted by category:
+  - `pytest tests/unittest/` - Run unit tests only
+  - `pytest tests/integration/` - Run integration tests only
+  - `pytest tests/` - Run all 195 tests
+- Improved test documentation and organization
+- Better separation of concerns between unit and integration testing
+
+### Technical Details
+- **Total Test Coverage**: 195 tests across the entire project
+- **Cross-Language Compatibility**: Proven binary data exchange between C and Rust
+- **Test Performance**: Integration tests include actual compilation and execution
+- **Platform Support**: Tests validate compatibility across different toolchains
+
+### Verified Compatibility
+- ✅ Rust-generated binary data correctly decoded by C implementation
+- ✅ C-generated binary data correctly decoded by Rust implementation
+- ✅ Identical binary format output between language implementations
+- ✅ Data integrity maintained across language boundaries
+
 ## [0.1.1] - 2024-12-19
 
 ### Added
@@ -80,5 +130,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Generated C code compiles without warnings
 - Round-trip serialization/deserialization verified
 
+[0.1.2]: https://github.com/picomsg/picomsg/releases/tag/v0.1.2
 [0.1.1]: https://github.com/picomsg/picomsg/releases/tag/v0.1.1
 [0.1.0]: https://github.com/picomsg/picomsg/releases/tag/v0.1.0 

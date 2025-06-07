@@ -8,6 +8,7 @@ from typing import Optional
 
 from .schema.parser import SchemaParser
 from .codegen.c import CCodeGenerator
+from .codegen.rust import RustCodeGenerator
 
 
 @click.group()
@@ -30,10 +31,13 @@ def main():
 @click.option('--header-name',
               default='picomsg_generated',
               help='Name for generated header files (C only)')
+@click.option('--module-name',
+              default='picomsg_generated',
+              help='Name for generated module files (Rust only)')
 @click.option('--structs-only',
               is_flag=True,
               help='Generate only struct definitions without error enums and serialization functions (C only)')
-def compile(schema_file: Path, lang: str, output: Path, header_name: str, structs_only: bool):
+def compile(schema_file: Path, lang: str, output: Path, header_name: str, module_name: str, structs_only: bool):
     """Compile a PicoMsg schema file to target language bindings."""
     try:
         # Parse schema
@@ -54,6 +58,10 @@ def compile(schema_file: Path, lang: str, output: Path, header_name: str, struct
             
             if structs_only:
                 click.echo("Mode: Structs only (no error enums or serialization functions)")
+        elif lang == 'rust':
+            generator = RustCodeGenerator(schema)
+            generator.set_option('module_name', module_name)
+            click.echo(f"Generating Rust code with module name: {module_name}")
         else:
             raise click.ClickException(f"Language '{lang}' not yet implemented")
         

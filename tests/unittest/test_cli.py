@@ -265,14 +265,62 @@ class TestCLI:
         try:
             result = self.runner.invoke(main, [
                 'compile', str(schema_file),
-                '--lang', 'rust'  # Not yet implemented
+                '--lang', 'python'  # Not yet implemented
             ])
             
             assert result.exit_code == 1
-            assert "Language 'rust' not yet implemented" in result.output
+            assert "Language 'python' not yet implemented" in result.output
             
         finally:
             schema_file.unlink()
+
+    def test_compile_command_rust_language(self):
+        """Test compile command with Rust language."""
+        schema_content = """
+        namespace test.rust;
+        
+        struct Point {
+            x: f32;
+            y: f32;
+        }
+        
+        message EchoRequest {
+            point: Point;
+            id: u32;
+        }
+        """
+        
+        schema_file = self.create_test_schema(schema_content)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            try:
+                result = self.runner.invoke(main, [
+                    'compile', str(schema_file),
+                    '--lang', 'rust',
+                    '--output', str(temp_path / 'generated'),
+                    '--module-name', 'test_module'
+                ])
+                
+                assert result.exit_code == 0
+                assert "Generating Rust code with module name: test_module" in result.output
+                assert "Generated 1 files" in result.output
+                
+                # Check output directory was created
+                output_dir = temp_path / 'generated'
+                assert output_dir.exists()
+                assert (output_dir / 'test_module.rs').exists()
+                
+                # Check basic Rust content
+                rust_content = (output_dir / 'test_module.rs').read_text()
+                assert "use serde::{Deserialize, Serialize};" in rust_content
+                assert "pub struct TestRustPoint {" in rust_content
+                assert "pub struct TestRustEchoRequest {" in rust_content
+                assert "pub enum TestRustError {" in rust_content
+                
+            finally:
+                schema_file.unlink()
     
     def test_compile_command_default_options(self):
         """Test compile command with default options."""
@@ -332,7 +380,7 @@ class TestCLI:
         """Test --version option."""
         result = self.runner.invoke(main, ['--version'])
         assert result.exit_code == 0
-        assert '0.1.0' in result.output
+        assert '0.1.2' in result.output
     
     def test_format_type_function(self):
         """Test the _format_type helper function."""
