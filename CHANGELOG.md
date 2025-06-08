@@ -5,6 +5,28 @@ All notable changes to PicoMsg will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2024-12-19
+
+### 🔧 **Code Quality Improvements**
+
+#### Rust Code Generation Enhancements ⭐⭐⭐⭐
+- **Dead code warnings suppression**: Added `#[allow(dead_code)]` attributes to generated Rust code
+- **Clean compilation**: Eliminated all compiler warnings for unused error enum variants and constants
+- **Professional code generation**: Generated code now compiles without any warnings
+- **Better developer experience**: Cleaner build output for projects using PicoMsg-generated Rust code
+
+#### Technical Details
+- **Error enum improvements**: Added `#[allow(dead_code)]` to `InvalidHeader`, `BufferTooSmall`, and `InvalidData` variants
+- **Constants optimization**: Suppressed warnings for unused magic bytes, version, and type ID constants
+- **Future-proof design**: Error variants remain available for use without generating warnings
+- **Backward compatibility**: No breaking changes to existing generated code functionality
+
+#### Benefits
+- **Cleaner builds**: Projects using PicoMsg Rust bindings now compile without warnings
+- **Professional output**: Generated code follows Rust best practices for library code
+- **Maintainability**: Easier to spot actual issues when warning noise is eliminated
+- **Developer productivity**: Faster development cycles with clean compiler output
+
 ## [0.4.0] - 2024-12-19
 
 ### 🚀 **Major Features**

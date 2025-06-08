@@ -80,9 +80,13 @@ class RustCodeGenerator(CodeGenerator):
         
         lines = [
             "// PicoMsg format constants",
+            "#[allow(dead_code)]",
             f"pub const {const_prefix}MAGIC_BYTE_1: u8 = 0xAB;",
+            "#[allow(dead_code)]",
             f"pub const {const_prefix}MAGIC_BYTE_2: u8 = 0xCD;",
+            "#[allow(dead_code)]",
             f"pub const {const_prefix}VERSION: u8 = {schema_version};",
+            "#[allow(dead_code)]",
             f"pub const {const_prefix}HEADER_SIZE: usize = 8;",
             "",
             "// Message type IDs",
@@ -92,6 +96,7 @@ class RustCodeGenerator(CodeGenerator):
         for message in self.schema.messages:
             type_id = self.type_id_counter
             self.type_id_counter += 1
+            lines.append("#[allow(dead_code)]")
             lines.append(f"pub const {const_prefix}{message.name.upper()}_TYPE_ID: u16 = {type_id};")
         
         return lines
@@ -105,6 +110,7 @@ class RustCodeGenerator(CodeGenerator):
         lines = [
             "// Error types",
             "#[derive(Debug, Clone, PartialEq)]",
+            "#[allow(dead_code)]",
             f"pub enum {error_name} {{",
             "    InvalidHeader,",
             "    BufferTooSmall,",
