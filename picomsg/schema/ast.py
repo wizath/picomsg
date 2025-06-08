@@ -210,10 +210,66 @@ class Field:
     """A field in a struct or message."""
     name: str
     type: Type
+    default_value: Optional[Union[int, float, str, bool]] = None
     
     def __post_init__(self):
         if not self.name.isidentifier():
             raise ValueError(f"Invalid field name: {self.name}")
+        
+        # Mark if this field has an explicit default (even if it's None/null)
+        # This will be set by the parser when a default is explicitly specified
+        if not hasattr(self, '_has_explicit_default'):
+            self._has_explicit_default = False
+        
+        # Validate default value type compatibility
+        if self.has_default():
+            self._validate_default_value()
+    
+    def _validate_default_value(self):
+        """Validate that the default value is compatible with the field type."""
+        if isinstance(self.type, PrimitiveType):
+            if self.type.name in ['u8', 'u16', 'u32', 'u64', 'i8', 'i16', 'i32', 'i64']:
+                if not isinstance(self.default_value, int):
+                    raise ValueError(f"Default value for {self.type.name} field '{self.name}' must be an integer")
+                self._validate_integer_range()
+            elif self.type.name in ['f32', 'f64']:
+                if not isinstance(self.default_value, (int, float)):
+                    raise ValueError(f"Default value for {self.type.name} field '{self.name}' must be a number")
+            elif self.type.name == 'bool':
+                if not isinstance(self.default_value, bool):
+                    raise ValueError(f"Default value for bool field '{self.name}' must be true or false")
+        elif isinstance(self.type, StringType):
+            if self.default_value is not None and not isinstance(self.default_value, str):
+                raise ValueError(f"Default value for string field '{self.name}' must be a string or null")
+        elif isinstance(self.type, (ArrayType, FixedArrayType, BytesType)):
+            if self.default_value is not None:
+                raise ValueError(f"Default values not supported for {type(self.type).__name__} field '{self.name}'")
+        # UserType, StructType, EnumType validation will be done during type resolution
+    
+    def _validate_integer_range(self):
+        """Validate integer default value is within type range."""
+        value = self.default_value
+        type_name = self.type.name
+        
+        ranges = {
+            'u8': (0, 255), 'u16': (0, 65535), 'u32': (0, 4294967295), 'u64': (0, 18446744073709551615),
+            'i8': (-128, 127), 'i16': (-32768, 32767), 'i32': (-2147483648, 2147483647), 
+            'i64': (-9223372036854775808, 9223372036854775807)
+        }
+        
+        min_val, max_val = ranges[type_name]
+        if not (min_val <= value <= max_val):
+            raise ValueError(f"Default value {value} for {type_name} field '{self.name}' is out of range [{min_val}, {max_val}]")
+    
+    def has_default(self) -> bool:
+        """Check if this field has a default value."""
+        # We need to distinguish between "no default specified" and "default is null"
+        # For now, we'll use a special marker to indicate explicit null
+        return hasattr(self, '_has_explicit_default') and self._has_explicit_default
+    
+    def is_required(self) -> bool:
+        """Check if this field is required (no default value)."""
+        return not self.has_default()
 
 
 @dataclass

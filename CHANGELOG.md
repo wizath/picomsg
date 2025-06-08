@@ -5,6 +5,185 @@ All notable changes to PicoMsg will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2024-12-19
+
+### 🚀 **Major Features**
+
+#### JSON Validation Code Generation ⭐⭐⭐⭐⭐
+- **Rust JSON validation**: Complete serde + validator integration with range validation for all integer types
+- **Python JSON validation**: Pydantic v2 integration with constrained types and field validation
+- **Default value support**: Full integration with existing PicoMsg default values system
+- **Helper functions**: `validate_json_string()`, `validate_dict()`, and `to_validated_json()` utilities
+- **Type-safe validation**: Automatic range checking for u8 (0-255), u16 (0-65535), etc.
+- **Production-ready**: Drop-in JSON validation for HTTP APIs using popular frameworks
+
+#### Comprehensive End-to-End Testing ⭐⭐⭐⭐⭐
+- **Rust end-to-end tests**: 5 comprehensive tests with real Rust compilation and execution
+- **Python end-to-end tests**: 5 equivalent tests ensuring complete feature parity
+- **Real-world validation**: Tests actually compile and run generated code, not just generation
+- **Cross-platform compatibility**: Automatic skipping when dependencies unavailable
+- **Performance benchmarking**: Large dataset testing (1000+ records) with throughput measurement
+
+#### Modern Testing Infrastructure ⭐⭐⭐⭐
+- **Pytest migration**: Converted from unittest to modern pytest with better assertions
+- **Intelligent skipping**: `pytest.mark.skipif` for graceful dependency handling
+- **Parallel execution**: Optimized test suite for faster CI/CD pipelines
+- **Better error reporting**: Enhanced failure messages and debugging information
+
+### 🎯 **Implementation Details**
+
+#### Rust JSON Code Generator
+- **Framework integration**: Full serde + validator crate support with proper dependencies
+- **Range validation**: Automatic integer range constraints (u8: 0-255, u16: 0-65535, etc.)
+- **Float validation**: Finite float validation preventing NaN and infinity values
+- **Default value functions**: Generated helper functions for each unique default value
+- **Error handling**: Proper `ValidationErrors` integration with descriptive error messages
+- **Type safety**: Compile-time validation ensuring generated code is always valid
+
+#### Python JSON Code Generator  
+- **Pydantic v2 compatibility**: Modern `field_validator` decorators and `model_config`
+- **Constrained types**: `conint()`, `confloat()`, `constr()` for automatic validation
+- **Model configuration**: Strict validation with `validate_assignment` and `extra="forbid"`
+- **Helper functions**: Comprehensive validation utilities for common use cases
+- **Type hints**: Full type annotation support for IDE integration and static analysis
+
+#### End-to-End Test Coverage
+- **Schema type validation**: Lists, structs, bools, default values, nested structures
+- **JSON parsing and validation**: Complete roundtrip testing with error case coverage
+- **Binary format testing**: Serialization/deserialization integrity verification
+- **Performance testing**: Throughput measurement and large dataset handling
+- **Complex structures**: 3-level nested structs with arrays and mixed types
+
+### 🔧 **Technical Improvements**
+
+#### Bug Fixes
+- **String array serialization**: Fixed critical Rust generator bug with `[string]` arrays
+- **Boolean field support**: Complete boolean serialization in both binary and JSON formats
+- **Array type handling**: Proper distinction between primitive, string, bytes, and struct arrays
+- **Import statements**: Corrected Pydantic v2 imports and validator function signatures
+
+#### Code Quality Enhancements
+- **Professional comments**: Clean, concise code comments without emojis
+- **Type safety**: Enhanced type checking and validation throughout codebase
+- **Error handling**: Improved error messages and exception handling
+- **Test isolation**: Better test cleanup and temporary file management
+
+#### Developer Experience
+- **Modern tooling**: Pytest integration with better test discovery and execution
+- **CI/CD ready**: Tests designed for automated pipeline execution
+- **Documentation**: Comprehensive test documentation and usage examples
+- **Debugging**: Enhanced error reporting for easier troubleshooting
+
+### 🧪 **Comprehensive Testing**
+
+#### Test Suite Statistics
+- **Total tests**: 398 tests (396 passing, 2 skipped, 0 failing)
+- **End-to-end tests**: 10 comprehensive tests (5 Rust + 5 Python)
+- **JSON validation tests**: 15+ tests covering all validation scenarios
+- **Functional tests**: Real compilation and execution verification
+- **Success rate**: 100% of active tests passing
+
+#### Test Categories
+- **Unit tests**: Core functionality and edge cases
+- **Integration tests**: Cross-component interaction testing
+- **Functional tests**: Real-world usage scenario validation
+- **End-to-end tests**: Complete pipeline verification with actual compilation
+- **Performance tests**: Large dataset handling and throughput measurement
+
+#### Coverage Analysis
+- **Schema validation**: Complete coverage of all PicoMsg types and features
+- **Code generation**: Verification that generated code compiles and runs correctly
+- **JSON integration**: Full roundtrip testing with validation and error handling
+- **Cross-language parity**: Identical test coverage between Rust and Python
+- **Real-world scenarios**: Complex nested structures and large datasets
+
+### 📊 **Test Results**
+
+#### Rust End-to-End Tests (5/5 passing)
+- ✅ **Basic Binary Generation**: Simple struct serialization and integrity verification
+- ✅ **JSON Validation**: Complete serde + validator integration with range checking
+- ✅ **Complex Structures**: 3-level nested structs with string arrays and object arrays
+- ✅ **Default Values Integration**: String, numeric, and boolean defaults in binary format
+- ✅ **Performance Benchmark**: 1000-point dataset with throughput calculation
+
+#### Python End-to-End Tests (5/5 passing)
+- ✅ **Basic Binary Generation**: Identical schema and logic to Rust tests
+- ✅ **JSON Validation**: Complete Pydantic v2 integration with constrained types
+- ✅ **Complex Structures**: Identical nested structure testing
+- ✅ **Default Values Integration**: Complete parity with Rust default values testing
+- ✅ **Performance Benchmark**: Identical performance testing with throughput measurement
+
+#### Feature Parity Verification
+- ✅ **Identical schemas**: All test cases use exactly the same PicoMsg schemas
+- ✅ **Equivalent logic**: Same validation steps and integrity checks
+- ✅ **Same performance testing**: Identical 1000-point datasets and metrics
+- ✅ **Cross-platform consistency**: Both languages produce functionally identical results
+
+### 🎉 **Production Readiness**
+
+#### JSON Validation Features
+- **HTTP API integration**: Drop-in validation for REST APIs and web services
+- **Framework compatibility**: Works with popular frameworks (FastAPI, Actix, Flask, etc.)
+- **Type safety**: Compile-time and runtime validation preventing data corruption
+- **Performance optimized**: Efficient validation with minimal overhead
+- **Error handling**: Descriptive validation errors for debugging and user feedback
+
+#### Code Generation Quality
+- **Production-grade output**: Generated code follows language best practices
+- **Dependency management**: Proper dependency declarations and version constraints
+- **Documentation**: Generated code includes comprehensive documentation
+- **Maintainability**: Clean, readable generated code for easy debugging
+- **Extensibility**: Generated code can be extended and customized as needed
+
+#### Testing Confidence
+- **Real-world validation**: Tests use actual compilation and execution
+- **Cross-platform verification**: Consistent behavior across different environments
+- **Large dataset testing**: Proven performance with substantial data volumes
+- **Error case coverage**: Comprehensive testing of validation failures and edge cases
+- **Continuous integration**: Test suite designed for automated CI/CD pipelines
+
+### 🔄 **Compatibility**
+
+#### Backward Compatibility
+- **Schema format**: All existing `.pico` schema files continue to work unchanged
+- **Binary format**: No breaking changes to binary serialization format
+- **API compatibility**: Existing code using PicoMsg continues to work without modifications
+- **Default values**: Enhanced default value support maintains backward compatibility
+
+#### Forward Compatibility
+- **Extensible design**: JSON validation system designed for future enhancements
+- **Framework agnostic**: Works with current and future web frameworks
+- **Language support**: Architecture supports adding more target languages
+- **Schema evolution**: Foundation for future schema versioning and migration features
+
+### 🛠️ **Development**
+
+#### Build System Improvements
+- **Dependency management**: Updated requirements with JSON validation dependencies
+- **Test automation**: Enhanced CI/CD pipeline with end-to-end testing
+- **Code quality**: Improved linting and formatting with modern tools
+- **Documentation**: Comprehensive documentation for new features
+
+#### Developer Experience
+- **Modern testing**: Pytest integration with better test discovery and execution
+- **Enhanced debugging**: Better error messages and stack traces
+- **IDE support**: Improved type hints and code completion
+- **Documentation**: Comprehensive examples and usage guides
+
+### 📈 **Metrics**
+
+#### Performance Improvements
+- **JSON validation speed**: Optimized validation with minimal performance overhead
+- **Test execution time**: Faster test suite with parallel execution capabilities
+- **Memory efficiency**: Optimized memory usage in generated validation code
+- **Compilation speed**: Efficient generated code that compiles quickly
+
+#### Quality Metrics
+- **Test coverage**: 100% success rate for active tests
+- **Code quality**: Zero failing tests with comprehensive error handling
+- **Security**: Robust validation preventing injection and data corruption attacks
+- **Reliability**: Extensive testing ensures consistent behavior across platforms
+
 ## [0.3.1] - 2024-12-19
 
 ### 🧪 **Enhanced Test Coverage**

@@ -33,7 +33,16 @@ PICOMSG_GRAMMAR = r"""
     struct_decl: "struct" NAME "{" field_decl* "}"
     message_decl: "message" NAME "{" field_decl* "}"
 
-    field_decl: NAME ":" type ";"
+    field_decl: NAME ":" type ["=" default_value] ";"
+    
+    default_value: NUMBER
+                 | NEGATIVE_NUMBER
+                 | FLOAT
+                 | NEGATIVE_FLOAT
+                 | STRING
+                 | BOOL_TRUE
+                 | BOOL_FALSE
+                 | NULL
 
     type: primitive_type
         | string_type
@@ -68,6 +77,13 @@ PICOMSG_GRAMMAR = r"""
     QUALIFIED_NAME: NAME ("." NAME)*
     NAME: /[a-zA-Z_][a-zA-Z0-9_]*/
     NUMBER: /[0-9]+/
+    NEGATIVE_NUMBER: /-[0-9]+/
+    FLOAT: /[0-9]+\.[0-9]+/
+    NEGATIVE_FLOAT: /-[0-9]+\.[0-9]+/
+    STRING: /"([^"\\]|\\.)*"/
+    BOOL_TRUE: "true"
+    BOOL_FALSE: "false"
+    NULL: "null"
 
     %import common.WS
     %import common.CPP_COMMENT
@@ -139,9 +155,26 @@ class SchemaTransformer(Transformer):
     def message_decl(self, name, *fields):
         return Message(name=str(name), fields=list(fields))
 
-    @v_args(inline=True)
-    def field_decl(self, name, type_):
-        return Field(name=str(name), type=type_)
+    def field_decl(self, children):
+        """Handle field declaration with optional default value."""
+        name, type_ = children[0], children[1]
+        
+        # Check if we have an explicit default value (including explicit null)
+        if len(children) > 2 and children[2] is not None:
+            default_value = children[2]
+            
+            # Convert ExplicitNull back to None but mark as having explicit default
+            if hasattr(default_value, '__class__') and default_value.__class__.__name__ == 'ExplicitNull':
+                default_value = None
+            
+            field = Field(name=str(name), type=type_, default_value=default_value)
+            field._has_explicit_default = True
+            # Validate the default value after setting the flag
+            field._validate_default_value()
+            return field
+        else:
+            # No default value specified
+            return Field(name=str(name), type=type_)
 
     @v_args(inline=True)
     def primitive_type(self, type_token):
@@ -167,6 +200,39 @@ class SchemaTransformer(Transformer):
     def user_type(self, name):
         # Return a generic user type that will be resolved during validation
         return UserType(name=str(name))
+    
+    @v_args(inline=True)
+    def default_value(self, value):
+        return value
+    
+    def NUMBER(self, token):
+        return int(token)
+    
+    def NEGATIVE_NUMBER(self, token):
+        return int(token)
+    
+    def FLOAT(self, token):
+        return float(token)
+    
+    def NEGATIVE_FLOAT(self, token):
+        return float(token)
+    
+    def STRING(self, token):
+        # Remove quotes and handle escape sequences
+        return str(token)[1:-1].encode().decode('unicode_escape')
+    
+    def BOOL_TRUE(self, token):
+        return True
+    
+    def BOOL_FALSE(self, token):
+        return False
+    
+    def NULL(self, token):
+        # Use a special marker to distinguish explicit null from missing default
+        class ExplicitNull:
+            def __repr__(self):
+                return "ExplicitNull()"
+        return ExplicitNull()
 
 
 class SchemaParser:

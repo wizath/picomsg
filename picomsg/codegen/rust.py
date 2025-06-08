@@ -323,6 +323,10 @@ class RustCodeGenerator(CodeGenerator):
     def _generate_primitive_read(self, field: Field, indent: str) -> List[str]:
         """Generate code to read a primitive field."""
         type_name = field.type.name
+        
+        if type_name == 'bool':
+            return [f"{indent}{field.name}: reader.read_u8()? != 0,"]
+        
         read_method = {
             'u8': 'read_u8()',
             'i8': 'read_i8()',
@@ -341,6 +345,10 @@ class RustCodeGenerator(CodeGenerator):
     def _generate_primitive_write(self, field: Field, indent: str) -> List[str]:
         """Generate code to write a primitive field."""
         type_name = field.type.name
+        
+        if type_name == 'bool':
+            return [f"{indent}writer.write_u8(if self.{field.name} {{ 1 }} else {{ 0 }})?;"]
+        
         write_method = {
             'u8': 'write_u8',
             'i8': 'write_i8',
@@ -410,8 +418,40 @@ class RustCodeGenerator(CodeGenerator):
                 f"{indent}    vec",
                 f"{indent}}},",
             ]
+        elif isinstance(field.type.element_type, StringType):
+            # For string arrays, use string reading logic
+            namespace_prefix = self._get_namespace_prefix()
+            error_name = f"{namespace_prefix}Error" if namespace_prefix else "PicoMsgError"
+            return [
+                f"{indent}{field.name}: {{",
+                f"{indent}    let count = reader.read_u16::<LittleEndian>()? as usize;",
+                f"{indent}    let mut vec = Vec::with_capacity(count);",
+                f"{indent}    for _ in 0..count {{",
+                f"{indent}        let len = reader.read_u16::<LittleEndian>()? as usize;",
+                f"{indent}        let mut buf = vec![0u8; len];",
+                f"{indent}        reader.read_exact(&mut buf)?;",
+                f"{indent}        vec.push(String::from_utf8(buf).map_err(|_| {error_name}::InvalidData)?);",
+                f"{indent}    }}",
+                f"{indent}    vec",
+                f"{indent}}},",
+            ]
+        elif isinstance(field.type.element_type, BytesType):
+            # For bytes arrays, use bytes reading logic
+            return [
+                f"{indent}{field.name}: {{",
+                f"{indent}    let count = reader.read_u16::<LittleEndian>()? as usize;",
+                f"{indent}    let mut vec = Vec::with_capacity(count);",
+                f"{indent}    for _ in 0..count {{",
+                f"{indent}        let len = reader.read_u16::<LittleEndian>()? as usize;",
+                f"{indent}        let mut buf = vec![0u8; len];",
+                f"{indent}        reader.read_exact(&mut buf)?;",
+                f"{indent}        vec.push(buf);",
+                f"{indent}    }}",
+                f"{indent}    vec",
+                f"{indent}}},",
+            ]
         else:
-            # For complex types, use the trait
+            # For struct types, use the trait
             return [
                 f"{indent}{field.name}: {{",
                 f"{indent}    let count = reader.read_u16::<LittleEndian>()? as usize;",
@@ -434,8 +474,26 @@ class RustCodeGenerator(CodeGenerator):
                 f"{indent}    {write_expr}",
                 f"{indent}}}",
             ]
+        elif isinstance(field.type.element_type, StringType):
+            # For string arrays, use string writing logic
+            return [
+                f"{indent}writer.write_u16::<LittleEndian>(self.{field.name}.len() as u16)?;",
+                f"{indent}for item in &self.{field.name} {{",
+                f"{indent}    writer.write_u16::<LittleEndian>(item.len() as u16)?;",
+                f"{indent}    writer.write_all(item.as_bytes())?;",
+                f"{indent}}}",
+            ]
+        elif isinstance(field.type.element_type, BytesType):
+            # For bytes arrays, use bytes writing logic
+            return [
+                f"{indent}writer.write_u16::<LittleEndian>(self.{field.name}.len() as u16)?;",
+                f"{indent}for item in &self.{field.name} {{",
+                f"{indent}    writer.write_u16::<LittleEndian>(item.len() as u16)?;",
+                f"{indent}    writer.write_all(item)?;",
+                f"{indent}}}",
+            ]
         else:
-            # For complex types
+            # For struct types
             return [
                 f"{indent}writer.write_u16::<LittleEndian>(self.{field.name}.len() as u16)?;",
                 f"{indent}for item in &self.{field.name} {{",
@@ -501,6 +559,10 @@ class RustCodeGenerator(CodeGenerator):
     def _get_primitive_read_expr(self, prim_type: PrimitiveType) -> str:
         """Get the read expression for a primitive type."""
         type_name = prim_type.name
+        
+        if type_name == 'bool':
+            return 'reader.read_u8()? != 0'
+        
         read_method = {
             'u8': 'reader.read_u8()?',
             'i8': 'reader.read_i8()?',
@@ -518,6 +580,10 @@ class RustCodeGenerator(CodeGenerator):
     def _get_primitive_write_expr(self, prim_type: PrimitiveType, var_name: str) -> str:
         """Get the write expression for a primitive type."""
         type_name = prim_type.name
+        
+        if type_name == 'bool':
+            return f'writer.write_u8(if *{var_name} {{ 1 }} else {{ 0 }})?;'
+        
         write_method = {
             'u8': f'writer.write_u8(*{var_name})?;',
             'i8': f'writer.write_i8(*{var_name})?;',

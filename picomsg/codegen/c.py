@@ -194,6 +194,9 @@ class CCodeGenerator(CodeGenerator):
         
         lines.append(f"}} {struct_name};")
         
+        # Generate initialization macro with defaults
+        lines.extend(self._generate_init_macro(struct.name, struct.fields))
+        
         return lines
     
     def _generate_message_definition(self, message: Message) -> List[str]:
@@ -216,6 +219,9 @@ class CCodeGenerator(CodeGenerator):
                 lines.append(f"    {c_type} {field.name};")
         
         lines.append(f"}} {message_name};")
+        
+        # Generate initialization macro with defaults
+        lines.extend(self._generate_init_macro(message.name, message.fields))
         
         return lines
     
@@ -364,4 +370,61 @@ class CCodeGenerator(CodeGenerator):
         if result and result[0].isdigit():
             result = '_' + result
         
-        return result 
+        return result
+    
+    def _generate_init_macro(self, type_name: str, fields: List[Field]) -> List[str]:
+        """Generate initialization macro with default values."""
+        namespace_prefix = self._get_namespace_prefix()
+        macro_name = f"{namespace_prefix.upper()}{type_name.upper()}_INIT"
+        type_name_c = f"{namespace_prefix}{type_name.lower()}_t"
+        
+        lines = [
+            "",
+            f"// Initialization macro for {type_name} with default values",
+            f"#define {macro_name}(...) ({type_name_c}){{ \\",
+        ]
+        
+        # Generate default values for each field
+        defaults = []
+        for field in fields:
+            default_val = self._get_c_default_value(field)
+            defaults.append(f"    .{field.name} = {default_val}")
+        
+        # Join defaults with commas and backslashes
+        for i, default in enumerate(defaults):
+            if i < len(defaults) - 1:
+                lines.append(f"{default}, \\")
+            else:
+                lines.append(f"{default}, \\")
+        
+        lines.extend([
+            "    __VA_ARGS__ \\",
+            "}",
+        ])
+        
+        return lines
+    
+    def _get_c_default_value(self, field: Field) -> str:
+        """Get the C representation of a field's default value."""
+        if field.default_value is None:
+            # No default value specified
+            if isinstance(field.type, StringType):
+                return "NULL"
+            elif isinstance(field.type, (ArrayType, BytesType)):
+                return "NULL"  # Variable-length types default to NULL
+            elif isinstance(field.type, FixedArrayType):
+                return "{0}"  # Fixed arrays default to zero-initialized
+            else:
+                return "0"  # Primitive types default to 0
+        
+        # Convert default value to C representation
+        if isinstance(field.default_value, bool):
+            return "true" if field.default_value else "false"
+        elif isinstance(field.default_value, str):
+            # Escape string for C
+            escaped = field.default_value.replace('\\', '\\\\').replace('"', '\\"')
+            return f'"{escaped}"'
+        elif isinstance(field.default_value, (int, float)):
+            return str(field.default_value)
+        else:
+            return "0"  # Fallback 
