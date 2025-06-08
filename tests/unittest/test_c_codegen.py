@@ -19,7 +19,7 @@ class TestCCodeGenerator:
     
     def test_generate_empty_schema(self):
         """Test generating code for empty schema."""
-        schema = Schema(namespace=None, structs=[], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -38,7 +38,7 @@ class TestCCodeGenerator:
     def test_generate_with_namespace(self):
         """Test generating code with namespace."""
         namespace = Namespace(name='test.namespace')
-        schema = Schema(namespace=namespace, structs=[], messages=[])
+        schema = Schema(namespace=namespace, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -55,7 +55,7 @@ class TestCCodeGenerator:
             Field(name='x', type=PrimitiveType(name='f32')),
             Field(name='y', type=PrimitiveType(name='f32')),
         ])
-        schema = Schema(namespace=None, structs=[struct], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -92,7 +92,7 @@ class TestCCodeGenerator:
             Field(name='f32_field', type=PrimitiveType(name='f32')),
             Field(name='f64_field', type=PrimitiveType(name='f64')),
         ])
-        schema = Schema(namespace=None, structs=[struct], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -117,7 +117,7 @@ class TestCCodeGenerator:
             Field(name='data', type=BytesType()),
             Field(name='numbers', type=ArrayType(element_type=PrimitiveType(name='u32'))),
         ])
-        schema = Schema(namespace=None, structs=[struct], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -140,7 +140,7 @@ class TestCCodeGenerator:
             Field(name='end', type=StructType(name='Point')),
         ])
         
-        schema = Schema(namespace=None, structs=[point_struct, line_struct], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[point_struct, line_struct], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -162,7 +162,7 @@ class TestCCodeGenerator:
             Field(name='start', type=StructType(name='Point')),
         ])
         
-        schema = Schema(namespace=namespace, structs=[point_struct, line_struct], messages=[])
+        schema = Schema(namespace=namespace, enums=[], structs=[point_struct, line_struct], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -177,7 +177,7 @@ class TestCCodeGenerator:
             Field(name='id', type=PrimitiveType(name='u32')),
             Field(name='data', type=BytesType()),
         ])
-        schema = Schema(namespace=None, structs=[], messages=[message])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[message])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -207,7 +207,7 @@ class TestCCodeGenerator:
         message2 = Message(name='Response', fields=[
             Field(name='id', type=PrimitiveType(name='u32')),
         ])
-        schema = Schema(namespace=None, structs=[], messages=[message1, message2])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[message1, message2])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -219,7 +219,7 @@ class TestCCodeGenerator:
     
     def test_generate_error_codes(self):
         """Test generating error code enum."""
-        schema = Schema(namespace=None, structs=[], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -236,7 +236,7 @@ class TestCCodeGenerator:
     
     def test_generate_custom_header_name(self):
         """Test generating code with custom header name."""
-        schema = Schema(namespace=None, structs=[], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         generator.set_option('header_name', 'custom_header')
         
@@ -254,7 +254,7 @@ class TestCCodeGenerator:
     
     def test_sanitize_identifier(self):
         """Test identifier sanitization."""
-        schema = Schema(namespace=None, structs=[], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         
         # Test various invalid identifiers
@@ -266,7 +266,7 @@ class TestCCodeGenerator:
     
     def test_get_c_type_mapping(self):
         """Test C type mapping."""
-        schema = Schema(namespace=None, structs=[], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         
         # Test primitive type mappings
@@ -285,7 +285,7 @@ class TestCCodeGenerator:
     def test_get_c_type_with_namespace(self):
         """Test C type mapping with namespace."""
         namespace = Namespace(name='test.ns')
-        schema = Schema(namespace=namespace, structs=[], messages=[])
+        schema = Schema(namespace=namespace, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         
         # Struct type should include namespace prefix
@@ -296,7 +296,7 @@ class TestCCodeGenerator:
         struct = Struct(name='Point', fields=[
             Field(name='x', type=PrimitiveType(name='f32')),
         ])
-        schema = Schema(namespace=None, structs=[struct], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
         generator = CCodeGenerator(schema)
         
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -338,7 +338,7 @@ class TestCCodeGenerator:
         ])
         
         namespace = Namespace(name='test.compile')
-        schema = Schema(namespace=namespace, structs=[header_struct, point_struct], messages=[message])
+        schema = Schema(namespace=namespace, enums=[], structs=[header_struct, point_struct], messages=[message])
         generator = CCodeGenerator(schema)
         
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -377,7 +377,7 @@ class TestCCodeGenerator:
             Field(name='id', type=PrimitiveType(name='u32')),
         ])
         
-        schema = Schema(namespace=None, structs=[struct], messages=[message])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[message])
         generator = CCodeGenerator(schema)
         
         files = generator.generate()
@@ -398,7 +398,7 @@ class TestCCodeGenerator:
     
     def test_header_guards(self):
         """Test that header guards are properly generated."""
-        schema = Schema(namespace=None, structs=[], messages=[])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
         generator.set_option('header_name', 'test_header')
         
@@ -420,7 +420,7 @@ class TestCCodeGenerator:
             Field(name="y", type=PrimitiveType(name="f32"))
         ])
         
-        schema = Schema(namespace=namespace, structs=[struct], messages=[])
+        schema = Schema(namespace=namespace, enums=[], structs=[struct], messages=[])
         
         generator = CCodeGenerator(schema)
         files = generator.generate()
@@ -445,7 +445,7 @@ class TestCCodeGenerator:
             Field(name="id", type=PrimitiveType(name="u32"))
         ])
         
-        schema = Schema(namespace=namespace, structs=[struct], messages=[message])
+        schema = Schema(namespace=namespace, enums=[], structs=[struct], messages=[message])
         
         generator = CCodeGenerator(schema)
         generator.set_option('structs_only', True)
@@ -486,7 +486,7 @@ class TestCCodeGenerator:
             Field(name="y", type=PrimitiveType(name="f32"))
         ])
         
-        schema = Schema(namespace=namespace, structs=[struct], messages=[])
+        schema = Schema(namespace=namespace, enums=[], structs=[struct], messages=[])
         
         # Generate regular mode
         generator_regular = CCodeGenerator(schema)
@@ -530,7 +530,7 @@ class TestCCodeGenerator:
         ])
         
         # Test with explicit version
-        schema_with_version = Schema(namespace=namespace, structs=[struct], messages=[], version=42)
+        schema_with_version = Schema(namespace=namespace, enums=[], structs=[struct], messages=[], version=42)
         generator = CCodeGenerator(schema_with_version)
         files = generator.generate()
         
@@ -538,7 +538,7 @@ class TestCCodeGenerator:
         assert "#define TEST_VERSION 42" in header_content
         
         # Test without version (should default to 1)
-        schema_no_version = Schema(namespace=namespace, structs=[struct], messages=[])
+        schema_no_version = Schema(namespace=namespace, enums=[], structs=[struct], messages=[])
         generator = CCodeGenerator(schema_no_version)
         files = generator.generate()
         
@@ -553,14 +553,14 @@ class TestCCodeGenerator:
         ])
         
         # Test minimum version (1)
-        schema = Schema(namespace=namespace, structs=[struct], messages=[], version=1)
+        schema = Schema(namespace=namespace, enums=[], structs=[struct], messages=[], version=1)
         generator = CCodeGenerator(schema)
         files = generator.generate()
         header_content = files["picomsg_generated.h"]
         assert "#define TEST_VERSION 1" in header_content
         
         # Test maximum version (255)
-        schema = Schema(namespace=namespace, structs=[struct], messages=[], version=255)
+        schema = Schema(namespace=namespace, enums=[], structs=[struct], messages=[], version=255)
         generator = CCodeGenerator(schema)
         files = generator.generate()
         header_content = files["picomsg_generated.h"]
@@ -573,7 +573,7 @@ class TestCCodeGenerator:
             Field(name="x", type=PrimitiveType(name="f32"))
         ])
         
-        schema = Schema(namespace=namespace, structs=[struct], messages=[], version=10)
+        schema = Schema(namespace=namespace, enums=[], structs=[struct], messages=[], version=10)
         generator = CCodeGenerator(schema)
         generator.set_option('structs_only', True)
         files = generator.generate()

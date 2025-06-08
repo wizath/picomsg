@@ -222,7 +222,7 @@ class TestSchema:
             Field(name='id', type=PrimitiveType(name='u32')),
         ])
         
-        schema = Schema(namespace=namespace, structs=[struct], messages=[message])
+        schema = Schema(enums=[], namespace=namespace, structs=[struct], messages=[message])
         assert schema.namespace == namespace
         assert len(schema.structs) == 1
         assert len(schema.messages) == 1
@@ -237,7 +237,7 @@ class TestSchema:
         ])
         
         with pytest.raises(ValueError, match="Duplicate struct names"):
-            Schema(namespace=None, structs=[struct1, struct2], messages=[])
+            Schema(enums=[], namespace=None, structs=[struct1, struct2], messages=[])
     
     def test_schema_duplicate_message_names(self):
         """Test schema creation with duplicate message names."""
@@ -249,7 +249,7 @@ class TestSchema:
         ])
         
         with pytest.raises(ValueError, match="Duplicate message names"):
-            Schema(namespace=None, structs=[], messages=[message1, message2])
+            Schema(enums=[], namespace=None, structs=[], messages=[message1, message2])
     
     def test_schema_struct_message_name_conflict(self):
         """Test schema creation with conflicting struct and message names."""
@@ -260,15 +260,15 @@ class TestSchema:
             Field(name='y', type=PrimitiveType(name='f32')),
         ])
         
-        with pytest.raises(ValueError, match="Conflicting struct and message names"):
-            Schema(namespace=None, structs=[struct], messages=[message])
+        with pytest.raises(ValueError, match="Conflicting enum, struct, and message names"):
+            Schema(enums=[], namespace=None, structs=[struct], messages=[message])
     
     def test_schema_get_struct(self):
         """Test getting struct by name."""
         struct = Struct(name='Point', fields=[
             Field(name='x', type=PrimitiveType(name='f32')),
         ])
-        schema = Schema(namespace=None, structs=[struct], messages=[])
+        schema = Schema(enums=[], namespace=None, structs=[struct], messages=[])
         
         found_struct = schema.get_struct('Point')
         assert found_struct == struct
@@ -281,7 +281,7 @@ class TestSchema:
         message = Message(name='TestMessage', fields=[
             Field(name='id', type=PrimitiveType(name='u32')),
         ])
-        schema = Schema(namespace=None, structs=[], messages=[message])
+        schema = Schema(enums=[], namespace=None, structs=[], messages=[message])
         
         found_message = schema.get_message('TestMessage')
         assert found_message == message
@@ -297,7 +297,7 @@ class TestSchema:
         message = Message(name='TestMessage', fields=[
             Field(name='field1', type=PrimitiveType(name='u32'))
         ])
-        schema = Schema(namespace=None, structs=[struct], messages=[message])
+        schema = Schema(enums=[], namespace=None, structs=[struct], messages=[message])
         
         # Test getting struct
         result = schema.get_type_by_name('TestStruct')
@@ -318,31 +318,31 @@ class TestSchema:
     def test_schema_version_field(self):
         """Test schema version field."""
         # Test schema without version (should default to None)
-        schema = Schema(namespace=None, structs=[], messages=[])
+        schema = Schema(enums=[], namespace=None, structs=[], messages=[])
         assert schema.version is None
         
         # Test schema with valid version
-        schema = Schema(namespace=None, structs=[], messages=[], version=5)
+        schema = Schema(enums=[], namespace=None, structs=[], messages=[], version=5)
         assert schema.version == 5
         
         # Test schema with version 1 (minimum valid)
-        schema = Schema(namespace=None, structs=[], messages=[], version=1)
+        schema = Schema(enums=[], namespace=None, structs=[], messages=[], version=1)
         assert schema.version == 1
         
         # Test schema with version 255 (maximum valid)
-        schema = Schema(namespace=None, structs=[], messages=[], version=255)
+        schema = Schema(enums=[], namespace=None, structs=[], messages=[], version=255)
         assert schema.version == 255
 
     def test_schema_version_validation(self):
         """Test schema version validation."""
         # Test invalid version 0
         with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
-            Schema(namespace=None, structs=[], messages=[], version=0)
+            Schema(enums=[], namespace=None, structs=[], messages=[], version=0)
         
         # Test invalid version 256
         with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
-            Schema(namespace=None, structs=[], messages=[], version=256)
+            Schema(enums=[], namespace=None, structs=[], messages=[], version=256)
         
         # Test invalid negative version
         with pytest.raises(ValueError, match="Schema version must be between 1 and 255"):
-            Schema(namespace=None, structs=[], messages=[], version=-1) 
+            Schema(enums=[], namespace=None, structs=[], messages=[], version=-1) 

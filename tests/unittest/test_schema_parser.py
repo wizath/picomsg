@@ -8,8 +8,8 @@ from pathlib import Path
 
 from picomsg.schema.parser import SchemaParser
 from picomsg.schema.ast import (
-    Schema, Namespace, Struct, Message, Field,
-    PrimitiveType, StringType, BytesType, ArrayType, StructType
+    Schema, Namespace, Struct, Message, Field, Enum, EnumValue,
+    PrimitiveType, StringType, BytesType, ArrayType, StructType, EnumType, FixedArrayType
 )
 
 
@@ -394,7 +394,7 @@ class TestSchemaParser:
             y: f32;
         }
         """
-        with pytest.raises(ValueError, match="Conflicting struct and message names"):
+        with pytest.raises(ValueError, match="Conflicting enum, struct, and message names"):
             self.parser.parse_string(schema_text)
     
     def test_parse_empty_struct(self):
@@ -518,4 +518,221 @@ class TestSchemaParser:
         
         assert schema.version is None
         assert schema.namespace.name == "test"
-        assert len(schema.structs) == 1 
+        assert len(schema.structs) == 1
+
+    def test_parse_basic_enum(self):
+        """Test parsing basic enum declaration."""
+        schema_text = """
+        enum Color : u8 {
+            Red = 1,
+            Green = 2,
+            Blue = 3,
+        }
+        """
+        
+        schema = self.parser.parse_string(schema_text)
+        
+        assert len(schema.enums) == 1
+        enum = schema.enums[0]
+        assert enum.name == "Color"
+        assert enum.backing_type.name == "u8"
+        assert len(enum.values) == 3
+        
+        assert enum.values[0].name == "Red"
+        assert enum.values[0].value == 1
+        assert enum.values[1].name == "Green"
+        assert enum.values[1].value == 2
+        assert enum.values[2].name == "Blue"
+        assert enum.values[2].value == 3
+
+    def test_parse_enum_auto_increment(self):
+        """Test parsing enum with auto-increment values."""
+        schema_text = """
+        enum Status : u16 {
+            Inactive,
+            Active = 10,
+            Pending,
+            Complete = 100,
+            Failed,
+        }
+        """
+        
+        schema = self.parser.parse_string(schema_text)
+        
+        assert len(schema.enums) == 1
+        enum = schema.enums[0]
+        assert enum.backing_type.name == "u16"
+        
+        # Check auto-increment values
+        assert enum.values[0].value == 0   # Inactive
+        assert enum.values[1].value == 10  # Active
+        assert enum.values[2].value == 11  # Pending
+        assert enum.values[3].value == 100 # Complete
+        assert enum.values[4].value == 101 # Failed
+
+    def test_parse_enum_in_struct(self):
+        """Test parsing enum used in struct fields."""
+        schema_text = """
+        enum Priority : u8 {
+            Low,
+            Medium,
+            High,
+        }
+        
+        struct Task {
+            name: string;
+            priority: Priority;
+        }
+        """
+        
+        schema = self.parser.parse_string(schema_text)
+        
+        assert len(schema.enums) == 1
+        assert len(schema.structs) == 1
+        
+        task_struct = schema.structs[0]
+        priority_field = task_struct.fields[1]
+        assert priority_field.name == "priority"
+        assert isinstance(priority_field.type, EnumType)
+        assert priority_field.type.name == "Priority"
+
+    def test_parse_enum_in_arrays(self):
+        """Test parsing enum used in array fields."""
+        schema_text = """
+        enum Color : u8 {
+            Red,
+            Green,
+            Blue,
+        }
+        
+        message Palette {
+            colors: [Color];
+            primary: [Color:3];
+        }
+        """
+        
+        schema = self.parser.parse_string(schema_text)
+        
+        assert len(schema.enums) == 1
+        assert len(schema.messages) == 1
+        
+        palette_message = schema.messages[0]
+        colors_field = palette_message.fields[0]
+        primary_field = palette_message.fields[1]
+        
+        # Variable array of enums
+        assert isinstance(colors_field.type, ArrayType)
+        assert isinstance(colors_field.type.element_type, EnumType)
+        assert colors_field.type.element_type.name == "Color"
+        
+        # Fixed array of enums
+        assert isinstance(primary_field.type, FixedArrayType)
+        assert isinstance(primary_field.type.element_type, EnumType)
+        assert primary_field.type.element_type.name == "Color"
+        assert primary_field.type.size == 3
+
+    def test_parse_enum_validation_errors(self):
+        """Test enum parsing validation errors."""
+        # Invalid backing type
+        schema_text = """
+        enum Color : f32 {
+            Red,
+        }
+        """
+        with pytest.raises(ValueError, match="must be an integer type"):
+            self.parser.parse_string(schema_text)
+        
+        # Value out of range for u8
+        schema_text = """
+        enum Color : u8 {
+            Red = 300,
+        }
+        """
+        with pytest.raises(ValueError, match="exceeds maximum"):
+            self.parser.parse_string(schema_text)
+        
+        # Duplicate enum value names
+        schema_text = """
+        enum Color : u8 {
+            Red,
+            Red,
+        }
+        """
+        with pytest.raises(ValueError, match="Duplicate enum value names"):
+            self.parser.parse_string(schema_text)
+
+    def test_parse_enum_name_conflicts(self):
+        """Test enum name conflicts with structs and messages."""
+        # Enum-struct conflict
+        schema_text = """
+        enum Test : u8 {
+            Value,
+        }
+        
+        struct Test {
+            field: u32;
+        }
+        """
+        with pytest.raises(ValueError, match="Conflicting enum, struct, and message names"):
+            self.parser.parse_string(schema_text)
+        
+        # Enum-message conflict
+        schema_text = """
+        enum Test : u8 {
+            Value,
+        }
+        
+        message Test {
+            field: u32;
+        }
+        """
+        with pytest.raises(ValueError, match="Conflicting enum, struct, and message names"):
+            self.parser.parse_string(schema_text)
+
+    def test_parse_undefined_enum_reference(self):
+        """Test parsing undefined enum reference."""
+        schema_text = """
+        struct Item {
+            color: UndefinedEnum;
+        }
+        """
+        with pytest.raises(ValueError, match="Undefined type"):
+            self.parser.parse_string(schema_text)
+
+    def test_parse_multiple_enums(self):
+        """Test parsing multiple enum declarations."""
+        schema_text = """
+        enum Color : u8 {
+            Red,
+            Green,
+            Blue,
+        }
+        
+        enum Size : u16 {
+            Small = 100,
+            Medium = 200,
+            Large = 300,
+        }
+        
+        struct Product {
+            color: Color;
+            size: Size;
+        }
+        """
+        
+        schema = self.parser.parse_string(schema_text)
+        
+        assert len(schema.enums) == 2
+        assert len(schema.structs) == 1
+        
+        color_enum = schema.get_enum("Color")
+        size_enum = schema.get_enum("Size")
+        
+        assert color_enum is not None
+        assert color_enum.backing_type.name == "u8"
+        assert size_enum is not None
+        assert size_enum.backing_type.name == "u16"
+        
+        product_struct = schema.structs[0]
+        assert isinstance(product_struct.fields[0].type, EnumType)
+        assert isinstance(product_struct.fields[1].type, EnumType) 

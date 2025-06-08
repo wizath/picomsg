@@ -2,12 +2,12 @@
 Version information for PicoMsg.
 """
 
-__version__ = "0.2.0"
-__version_info__ = (0, 2, 0)
+__version__ = "0.3.0"
+__version_info__ = (0, 3, 0)
 
 # Version components
 MAJOR = 0
-MINOR = 2
+MINOR = 3
 PATCH = 0
 
 # Build metadata

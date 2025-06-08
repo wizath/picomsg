@@ -12,7 +12,7 @@ from picomsg.codegen.rust import RustCodeGenerator
 
 def test_rust_generator_basic():
     """Test basic Rust code generation."""
-    schema = Schema(
+    schema = Schema(enums=[], 
         namespace=Namespace("test.example"),
         structs=[
             Struct("Point", [
@@ -53,7 +53,7 @@ def test_rust_generator_basic():
 
 def test_rust_generator_primitives():
     """Test Rust generation with all primitive types."""
-    schema = Schema(
+    schema = Schema(enums=[], 
         namespace=None,
         structs=[
             Struct("AllTypes", [
@@ -90,7 +90,7 @@ def test_rust_generator_primitives():
 
 def test_rust_generator_strings_and_bytes():
     """Test Rust generation with string and bytes types."""
-    schema = Schema(
+    schema = Schema(enums=[], 
         namespace=None,
         structs=[
             Struct("StringStruct", [
@@ -118,7 +118,7 @@ def test_rust_generator_strings_and_bytes():
 
 def test_rust_generator_arrays():
     """Test Rust generation with array types."""
-    schema = Schema(
+    schema = Schema(enums=[], 
         namespace=None,
         structs=[
             Struct("ArrayStruct", [
@@ -144,7 +144,7 @@ def test_rust_generator_arrays():
 
 def test_rust_generator_with_version():
     """Test Rust generation with schema version."""
-    schema = Schema(
+    schema = Schema(enums=[], 
         namespace=Namespace("test.versioned"),
         structs=[],
         messages=[],
@@ -160,7 +160,7 @@ def test_rust_generator_with_version():
 
 def test_rust_generator_module_name_option():
     """Test Rust generator with custom module name."""
-    schema = Schema(
+    schema = Schema(enums=[], 
         namespace=None,
         structs=[
             Struct("TestStruct", [Field("value", PrimitiveType("u32"))])
@@ -177,7 +177,7 @@ def test_rust_generator_module_name_option():
 
 def test_rust_generator_no_namespace():
     """Test Rust generation without namespace."""
-    schema = Schema(
+    schema = Schema(enums=[], 
         namespace=None,
         structs=[
             Struct("Point", [
@@ -203,7 +203,7 @@ def test_rust_generator_no_namespace():
 
 def test_rust_sanitize_identifier():
     """Test Rust identifier sanitization."""
-    schema = Schema(namespace=None, structs=[], messages=[])
+    schema = Schema(enums=[], namespace=None, structs=[], messages=[])
     generator = RustCodeGenerator(schema)
     
     # Test normal identifiers

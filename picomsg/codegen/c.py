@@ -5,7 +5,7 @@ C code generator for PicoMsg.
 from typing import Dict, List, Tuple
 from ..schema.ast import (
     Schema, Struct, Message, Field, Type,
-    PrimitiveType, StringType, BytesType, ArrayType, StructType
+    PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
 )
 from ..format.alignment import calculate_struct_layout, get_c_packed_attribute
 from .base import CodeGenerator
@@ -56,6 +56,11 @@ class CCodeGenerator(CodeGenerator):
         # Generate type definitions only if not structs_only mode
         if not structs_only:
             lines.extend(self._generate_type_definitions())
+            lines.append("")
+        
+        # Generate enum definitions
+        for enum in self.schema.enums:
+            lines.extend(self._generate_enum_definition(enum))
             lines.append("")
         
         # Generate struct definitions
@@ -140,6 +145,34 @@ class CCodeGenerator(CodeGenerator):
         
         return lines
     
+    def _generate_enum_definition(self, enum) -> List[str]:
+        """Generate C enum definition."""
+        from ..schema.ast import Enum
+        namespace_prefix = self._get_namespace_prefix()
+        enum_name = f"{namespace_prefix}{enum.name.lower()}_t"
+        
+        # Get the backing type
+        backing_type_map = {
+            'u8': 'uint8_t', 'u16': 'uint16_t', 'u32': 'uint32_t', 'u64': 'uint64_t',
+            'i8': 'int8_t', 'i16': 'int16_t', 'i32': 'int32_t', 'i64': 'int64_t'
+        }
+        backing_type = backing_type_map.get(enum.backing_type.name, 'int')
+        
+        lines = [
+            f"// Enum: {enum.name}",
+            f"typedef enum {{",
+        ]
+        
+        # Generate enum values
+        for value in enum.values:
+            lines.append(f"    {namespace_prefix.upper()}{enum.name.upper()}_{value.name.upper()} = {value.value},")
+        
+        lines.extend([
+            f"}} {enum_name};",
+        ])
+        
+        return lines
+    
     def _generate_struct_definition(self, struct: Struct) -> List[str]:
         """Generate C struct definition."""
         namespace_prefix = self._get_namespace_prefix()
@@ -152,8 +185,12 @@ class CCodeGenerator(CodeGenerator):
         
         # Generate fields
         for field in struct.fields:
-            c_type = self._get_c_type(field.type)
-            lines.append(f"    {c_type} {field.name};")
+            if isinstance(field.type, FixedArrayType):
+                element_type = self._get_c_type(field.type.element_type)
+                lines.append(f"    {element_type} {field.name}[{field.type.size}];")
+            else:
+                c_type = self._get_c_type(field.type)
+                lines.append(f"    {c_type} {field.name};")
         
         lines.append(f"}} {struct_name};")
         
@@ -171,8 +208,12 @@ class CCodeGenerator(CodeGenerator):
         
         # Generate fields
         for field in message.fields:
-            c_type = self._get_c_type(field.type)
-            lines.append(f"    {c_type} {field.name};")
+            if isinstance(field.type, FixedArrayType):
+                element_type = self._get_c_type(field.type.element_type)
+                lines.append(f"    {element_type} {field.name}[{field.type.size}];")
+            else:
+                c_type = self._get_c_type(field.type)
+                lines.append(f"    {c_type} {field.name};")
         
         lines.append(f"}} {message_name};")
         
@@ -279,6 +320,7 @@ class CCodeGenerator(CodeGenerator):
                 'i64': 'int64_t',
                 'f32': 'float',
                 'f64': 'double',
+                'bool': 'bool',
             }
             return type_map.get(type_.name, type_.name)
         
@@ -291,7 +333,17 @@ class CCodeGenerator(CodeGenerator):
         elif isinstance(type_, ArrayType):
             return "uint16_t"  # Count prefix only for now
         
+        elif isinstance(type_, FixedArrayType):
+            element_type = self._get_c_type(type_.element_type)
+            # For fixed arrays, we need to handle the array syntax differently
+            # Return just the element type, and handle the array size in field generation
+            return element_type
+        
         elif isinstance(type_, StructType):
+            namespace_prefix = self._get_namespace_prefix()
+            return f"{namespace_prefix}{type_.name.lower()}_t"
+        
+        elif isinstance(type_, EnumType):
             namespace_prefix = self._get_namespace_prefix()
             return f"{namespace_prefix}{type_.name.lower()}_t"
         

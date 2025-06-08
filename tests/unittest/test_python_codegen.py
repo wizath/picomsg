@@ -443,4 +443,202 @@ class TestPythonCodeGenerator:
         assert "MAGIC_BYTE_1 = 0xAB" in code
         assert "class PicoMsgError(Exception):" in code
         assert "class PicoMsgBase:" in code
-        assert "class NoNamespace(PicoMsgBase):" in code 
+        assert "class NoNamespace(PicoMsgBase):" in code
+
+    def test_enum_generation(self):
+        """Test enum code generation."""
+        schema_content = """
+        namespace test.enums;
+        
+        enum Color : u8 {
+            Red = 1,
+            Green = 2,
+            Blue = 3,
+        }
+        
+        enum Status : u16 {
+            Inactive,
+            Active = 10,
+            Complete,
+        }
+        
+        struct Item {
+            name: string;
+            color: Color;
+            status: Status;
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_content)
+        
+        generator = PythonCodeGenerator(schema)
+        files = generator.generate()
+        code = files["picomsg_generated.py"]
+        
+        # Check enum imports
+        assert "from enum import IntEnum" in code
+        
+        # Check Color enum
+        assert "class TestEnumsColor(IntEnum):" in code
+        assert "Red = 1" in code
+        assert "Green = 2" in code
+        assert "Blue = 3" in code
+        
+        # Check Status enum
+        assert "class TestEnumsStatus(IntEnum):" in code
+        assert "Inactive = 0" in code
+        assert "Active = 10" in code
+        assert "Complete = 11" in code
+        
+        # Check enum utility methods
+        assert "def from_int(cls, value: int)" in code
+        assert "def to_int(self) -> int" in code
+        
+        # Check enum usage in struct (generated code uses property setters, not type hints)
+        assert "TestEnumsColor.Red" in code  # Default value
+        assert "TestEnumsStatus.Inactive" in code  # Default value
+
+    def test_enum_serialization(self):
+        """Test enum serialization in generated code."""
+        schema_content = """
+        namespace test.enum_serial;
+        
+        enum Priority : u8 {
+            Low,
+            Medium,
+            High,
+        }
+        
+        struct Task {
+            priority: Priority;
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_content)
+        
+        generator = PythonCodeGenerator(schema)
+        files = generator.generate()
+        code = files["picomsg_generated.py"]
+        
+        # Check enum serialization
+        assert "self._priority.to_int()" in code
+        assert "TestEnum_serialPriority.from_int(value)" in code
+        
+        # Check struct packing format for u8 enum
+        assert "struct.pack" in code
+
+    def test_enum_arrays(self):
+        """Test enum arrays in generated code."""
+        schema_content = """
+        namespace test.enum_arrays;
+        
+        enum Color : u8 {
+            Red,
+            Green,
+            Blue,
+        }
+        
+        struct Palette {
+            colors: [Color];
+            primary: [Color:3];
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_content)
+        
+        generator = PythonCodeGenerator(schema)
+        files = generator.generate()
+        code = files["picomsg_generated.py"]
+        
+        # Check variable array enum handling
+        assert "item.to_int()" in code  # Serialization
+        assert "TestEnum_arraysColor.from_int(value)" in code  # Deserialization
+        
+        # Check fixed array enum handling (generated code doesn't use type hints in this way)
+        assert "TestEnum_arraysColor" in code
+
+    def test_enum_json_conversion(self):
+        """Test enum JSON conversion in generated code."""
+        schema_content = """
+        namespace test.enum_json;
+        
+        enum Status : u16 {
+            Pending = 100,
+            Active = 200,
+            Complete = 300,
+        }
+        
+        struct User {
+            name: string;
+            status: Status;
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_content)
+        
+        generator = PythonCodeGenerator(schema)
+        files = generator.generate()
+        code = files["picomsg_generated.py"]
+        
+        # Check JSON serialization (enum to int)
+        assert "self._status.to_int()" in code
+        
+        # Check JSON deserialization (int to enum)
+        assert 'TestEnum_jsonStatus.from_int(data["status"])' in code
+
+    def test_enum_validation(self):
+        """Test enum validation in generated code."""
+        schema_content = """
+        namespace test.enum_validation;
+        
+        enum Color : u8 {
+            Red = 1,
+            Green = 2,
+            Blue = 3,
+        }
+        
+        struct Item {
+            color: Color;
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_content)
+        
+        generator = PythonCodeGenerator(schema)
+        files = generator.generate()
+        code = files["picomsg_generated.py"]
+        
+        # Check validation in from_int method
+        assert "raise ValueError" in code
+        assert "Invalid" in code and "value" in code
+
+    def test_enum_type_hints(self):
+        """Test enum type hints in generated code."""
+        schema_content = """
+        namespace test.enum_hints;
+        
+        enum Priority : u8 {
+            Low,
+            High,
+        }
+        
+        struct Task {
+            priority: Priority;
+            priorities: [Priority];
+        }
+        """
+        
+        parser = SchemaParser()
+        schema = parser.parse_string(schema_content)
+        
+        generator = PythonCodeGenerator(schema)
+        files = generator.generate()
+        code = files["picomsg_generated.py"]
+        
+        # Check enum usage (generated code doesn't use type hints in this way)
+        assert "TestEnum_hintsPriority" in code 

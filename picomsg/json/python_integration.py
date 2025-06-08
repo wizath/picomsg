@@ -11,7 +11,7 @@ import json
 
 from ..codegen.python import PythonCodeGenerator
 from ..schema.ast import Schema, Struct, Message, Field, Type as PicoType
-from ..schema.ast import PrimitiveType, StringType, BytesType, ArrayType, StructType
+from ..schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType
 
 
 class PythonJSONCodeGenerator(PythonCodeGenerator):
@@ -415,6 +415,8 @@ class JSONStreamingError(PicoMsgJSONError):
             return f'# Bytes field "{field_name}" - validated during construction'
         elif isinstance(field_type, ArrayType):
             return self._generate_array_field_validation(field_name, field_type)
+        elif isinstance(field_type, FixedArrayType):
+            return self._generate_fixed_array_field_validation(field_name, field_type)
         elif isinstance(field_type, StructType):
             return f'self.{field_name}.validate_json()'
         
@@ -433,6 +435,8 @@ class JSONStreamingError(PicoMsgJSONError):
             return f'JSONValidator.validate_bytes_type(data["{field_name}"], "{field_name}")'
         elif isinstance(field_type, ArrayType):
             return self._generate_array_data_validation(field_name, field_type)
+        elif isinstance(field_type, FixedArrayType):
+            return self._generate_fixed_array_data_validation(field_name, field_type)
         elif isinstance(field_type, StructType):
             struct_name = self._to_class_name(field_type.name)
             return f'{struct_name}.validate_json_data(data["{field_name}"])'
@@ -485,6 +489,65 @@ class JSONStreamingError(PicoMsgJSONError):
             {struct_name}.validate_json_data(item)'''
         
         return f'# Array field "{field_name}" - basic validation'
+    
+    def _generate_fixed_array_field_validation(self, field_name: str, fixed_array_type: FixedArrayType) -> str:
+        """Generate validation for fixed array fields."""
+        element_type = fixed_array_type.element_type
+        size = fixed_array_type.size
+        
+        validation_lines = [
+            f'if len(self.{field_name}) != {size}:',
+            f'    raise JSONValidationError("Fixed array must have exactly {size} elements", "{field_name}", len(self.{field_name}))'
+        ]
+        
+        if isinstance(element_type, PrimitiveType):
+            validation_lines.extend([
+                f'for i, item in enumerate(self.{field_name}):',
+                f'    JSONValidator.validate_primitive_type(item, "{element_type.name}", f"{field_name}[{{i}}]")'
+            ])
+        elif isinstance(element_type, StringType):
+            validation_lines.extend([
+                f'for i, item in enumerate(self.{field_name}):',
+                f'    JSONValidator.validate_string_type(item, f"{field_name}[{{i}}]")'
+            ])
+        elif isinstance(element_type, StructType):
+            validation_lines.extend([
+                f'for i, item in enumerate(self.{field_name}):',
+                f'    item.validate_json()'
+            ])
+        
+        return '\n        '.join(validation_lines)
+    
+    def _generate_fixed_array_data_validation(self, field_name: str, fixed_array_type: FixedArrayType) -> str:
+        """Generate validation for fixed array data from JSON."""
+        element_type = fixed_array_type.element_type
+        size = fixed_array_type.size
+        
+        validation_lines = [
+            f'if not isinstance(data["{field_name}"], list):',
+            f'    raise JSONValidationError("Expected array", "{field_name}", data["{field_name}"])',
+            f'if len(data["{field_name}"]) != {size}:',
+            f'    raise JSONValidationError("Fixed array must have exactly {size} elements", "{field_name}", len(data["{field_name}"]))'
+        ]
+        
+        if isinstance(element_type, PrimitiveType):
+            validation_lines.extend([
+                f'for i, item in enumerate(data["{field_name}"]):',
+                f'    JSONValidator.validate_primitive_type(item, "{element_type.name}", f"{field_name}[{{i}}]")'
+            ])
+        elif isinstance(element_type, StringType):
+            validation_lines.extend([
+                f'for i, item in enumerate(data["{field_name}"]):',
+                f'    JSONValidator.validate_string_type(item, f"{field_name}[{{i}}]")'
+            ])
+        elif isinstance(element_type, StructType):
+            struct_name = self._to_class_name(element_type.name)
+            validation_lines.extend([
+                f'for i, item in enumerate(data["{field_name}"]):',
+                f'    {struct_name}.validate_json_data(item)'
+            ])
+        
+        return '\n        '.join(validation_lines)
     
     def _generate_json_utilities(self) -> str:
         """Generate JSON utility functions."""

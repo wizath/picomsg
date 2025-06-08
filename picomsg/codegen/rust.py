@@ -5,7 +5,7 @@ Rust code generator for PicoMsg.
 from typing import Dict, List
 from ..schema.ast import (
     Schema, Struct, Message, Field, Type,
-    PrimitiveType, StringType, BytesType, ArrayType, StructType
+    PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType
 )
 from .base import CodeGenerator
 
@@ -296,6 +296,8 @@ class RustCodeGenerator(CodeGenerator):
             return self._generate_bytes_read(field, indent)
         elif isinstance(field.type, ArrayType):
             return self._generate_array_read(field, indent)
+        elif isinstance(field.type, FixedArrayType):
+            return self._generate_fixed_array_read(field, indent)
         elif isinstance(field.type, StructType):
             return self._generate_struct_read(field, indent)
         else:
@@ -311,6 +313,8 @@ class RustCodeGenerator(CodeGenerator):
             return self._generate_bytes_write(field, indent)
         elif isinstance(field.type, ArrayType):
             return self._generate_array_write(field, indent)
+        elif isinstance(field.type, FixedArrayType):
+            return self._generate_fixed_array_write(field, indent)
         elif isinstance(field.type, StructType):
             return self._generate_struct_write(field, indent)
         else:
@@ -439,6 +443,50 @@ class RustCodeGenerator(CodeGenerator):
                 f"{indent}}}",
             ]
     
+    def _generate_fixed_array_read(self, field: Field, indent: str) -> List[str]:
+        """Generate code to read a fixed array field."""
+        if isinstance(field.type.element_type, PrimitiveType):
+            # For primitive fixed arrays
+            return [
+                f"{indent}{field.name}: {{",
+                f"{indent}    let mut arr = [{self._get_rust_type(field.type.element_type)}::default(); {field.type.size}];",
+                f"{indent}    for i in 0..{field.type.size} {{",
+                f"{indent}        arr[i] = {self._get_primitive_read_expr(field.type.element_type)};",
+                f"{indent}    }}",
+                f"{indent}    arr",
+                f"{indent}}},",
+            ]
+        else:
+            # For complex types, use Vec for now (Rust arrays with complex types are tricky)
+            element_type = self._get_rust_type(field.type.element_type)
+            return [
+                f"{indent}{field.name}: {{",
+                f"{indent}    let mut vec = Vec::with_capacity({field.type.size});",
+                f"{indent}    for _ in 0..{field.type.size} {{",
+                f"{indent}        vec.push({element_type}::from_reader(reader)?);",
+                f"{indent}    }}",
+                f"{indent}    vec",
+                f"{indent}}},",
+            ]
+    
+    def _generate_fixed_array_write(self, field: Field, indent: str) -> List[str]:
+        """Generate code to write a fixed array field."""
+        if isinstance(field.type.element_type, PrimitiveType):
+            # For primitive fixed arrays
+            write_expr = self._get_primitive_write_expr(field.type.element_type, "item")
+            return [
+                f"{indent}for item in &self.{field.name} {{",
+                f"{indent}    {write_expr}",
+                f"{indent}}}",
+            ]
+        else:
+            # For complex types
+            return [
+                f"{indent}for item in &self.{field.name} {{",
+                f"{indent}    item.to_writer(writer)?;",
+                f"{indent}}}",
+            ]
+    
     def _generate_struct_read(self, field: Field, indent: str) -> List[str]:
         """Generate code to read a struct field."""
         namespace_prefix = self._get_namespace_prefix()
@@ -495,6 +543,13 @@ class RustCodeGenerator(CodeGenerator):
         elif isinstance(type_, ArrayType):
             element_type = self._get_rust_type(type_.element_type)
             return f"Vec<{element_type}>"
+        elif isinstance(type_, FixedArrayType):
+            element_type = self._get_rust_type(type_.element_type)
+            if isinstance(type_.element_type, PrimitiveType):
+                return f"[{element_type}; {type_.size}]"
+            else:
+                # For complex types, use Vec for now (Rust arrays with complex types are tricky)
+                return f"Vec<{element_type}>"
         elif isinstance(type_, StructType):
             namespace_prefix = self._get_namespace_prefix()
             return f"{namespace_prefix}{type_.name}" if namespace_prefix else type_.name

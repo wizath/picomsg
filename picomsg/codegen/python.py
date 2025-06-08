@@ -4,8 +4,8 @@ Python code generator for PicoMsg.
 
 from typing import Dict, List
 from ..schema.ast import (
-    Schema, Struct, Message, Field, Type,
-    PrimitiveType, StringType, BytesType, ArrayType, StructType
+    Schema, Struct, Message, Field, Type, Enum, EnumValue,
+    PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
 )
 from .base import CodeGenerator
 
@@ -34,6 +34,7 @@ class PythonCodeGenerator(CodeGenerator):
             '',
             'import struct',
             'import json',
+            'from enum import IntEnum',
             'from typing import Dict, Any, Optional, Union, List',
             'from io import BytesIO',
             '',
@@ -50,6 +51,11 @@ class PythonCodeGenerator(CodeGenerator):
         # Generate base class
         lines.extend(self._generate_base_class())
         lines.append('')
+        
+        # Generate enum classes
+        for enum in self.schema.enums:
+            lines.extend(self._generate_enum_class(enum))
+            lines.append('')
         
         # Generate struct classes
         for struct in self.schema.structs:
@@ -186,6 +192,38 @@ class PythonCodeGenerator(CodeGenerator):
             '        data = json.loads(json_str)',
             '        return cls.from_dict(data)',
         ]
+        
+        return lines
+    
+    def _generate_enum_class(self, enum: Enum) -> List[str]:
+        """Generate Python enum class."""
+        namespace_prefix = self._get_namespace_prefix()
+        class_name = f'{namespace_prefix}{enum.name}' if namespace_prefix else enum.name
+        
+        lines = [
+            f'class {class_name}(IntEnum):',
+            f'    """Enum: {enum.name} : {enum.backing_type.name}"""',
+        ]
+        
+        # Add enum values
+        for value in enum.values:
+            lines.append(f'    {value.name} = {value.value}')
+        
+        # Add utility methods
+        lines.extend([
+            '',
+            '    @classmethod',
+            '    def from_int(cls, value: int) -> "Self":',
+            '        """Create enum from integer value."""',
+            '        try:',
+            '            return cls(value)',
+            '        except ValueError:',
+            f'            raise ValueError(f"Invalid {enum.name} value: {{value}}")',
+            '',
+            '    def to_int(self) -> int:',
+            '        """Convert enum to integer value."""',
+            '        return int(self.value)',
+        ])
         
         return lines
     
@@ -345,8 +383,12 @@ class PythonCodeGenerator(CodeGenerator):
             return self._generate_bytes_write(field)
         elif isinstance(field.type, ArrayType):
             return self._generate_array_write(field)
+        elif isinstance(field.type, FixedArrayType):
+            return self._generate_fixed_array_write(field)
         elif isinstance(field.type, StructType):
             return self._generate_struct_write(field)
+        elif isinstance(field.type, EnumType):
+            return self._generate_enum_write(field)
         else:
             return [f'        # TODO: Unsupported type for field {field.name}']
     
@@ -360,8 +402,12 @@ class PythonCodeGenerator(CodeGenerator):
             return self._generate_bytes_read(field)
         elif isinstance(field.type, ArrayType):
             return self._generate_array_read(field)
+        elif isinstance(field.type, FixedArrayType):
+            return self._generate_fixed_array_read(field)
         elif isinstance(field.type, StructType):
             return self._generate_struct_read(field)
+        elif isinstance(field.type, EnumType):
+            return self._generate_enum_read(field)
         else:
             return [f'        # TODO: Unsupported type for field {field.name}']
     
@@ -441,6 +487,17 @@ class PythonCodeGenerator(CodeGenerator):
                 f'        for item in self._{field.name}:',
                 f'            item._write_to_buffer(buffer)',
             ])
+        elif isinstance(field.type.element_type, EnumType):
+            # Get the enum definition to determine backing type
+            enum_def = self.schema.get_enum(field.type.element_type.name)
+            if enum_def:
+                format_char = self._get_struct_format(enum_def.backing_type)
+                lines.extend([
+                    f'        for item in self._{field.name}:',
+                    f'            buffer.write(struct.pack("<{format_char}", item.to_int()))',
+                ])
+            else:
+                lines.append(f'        # ERROR: Enum {field.type.element_type.name} not found')
         elif isinstance(field.type.element_type, ArrayType):
             lines.extend([
                 f'        for item in self._{field.name}:',
@@ -510,6 +567,20 @@ class PythonCodeGenerator(CodeGenerator):
             namespace_prefix = self._get_namespace_prefix()
             element_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
             lines.append(f'            item = {element_class}.from_buffer(buffer)')
+        elif isinstance(field.type.element_type, EnumType):
+            # Get the enum definition to determine backing type
+            enum_def = self.schema.get_enum(field.type.element_type.name)
+            if enum_def:
+                namespace_prefix = self._get_namespace_prefix()
+                enum_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
+                format_char = self._get_struct_format(enum_def.backing_type)
+                size = self._get_type_size(enum_def.backing_type)
+                lines.extend([
+                    f'            value = struct.unpack("<{format_char}", buffer.read({size}))[0]',
+                    f'            item = {enum_class}.from_int(value)',
+                ])
+            else:
+                lines.append(f'            # ERROR: Enum {field.type.element_type.name} not found')
         elif isinstance(field.type.element_type, ArrayType):
             lines.extend([
                 f'            # Nested array: read count then elements',
@@ -562,6 +633,103 @@ class PythonCodeGenerator(CodeGenerator):
         lines.append(f'            self._{field.name}.append(item)')
         return lines
     
+    def _generate_fixed_array_write(self, field: Field) -> List[str]:
+        """Generate write code for fixed-size array types."""
+        lines = [
+            f'        # Fixed array field: [{field.type.size} elements]',
+            f'        if len(self._{field.name}) != {field.type.size}:',
+            f'            raise ValueError(f"Fixed array {field.name} must have exactly {field.type.size} elements, got {{len(self._{field.name})}}")',
+        ]
+        
+        if isinstance(field.type.element_type, PrimitiveType):
+            format_char = self._get_struct_format(field.type.element_type)
+            lines.extend([
+                f'        for item in self._{field.name}:',
+                f'            buffer.write(struct.pack("<{format_char}", item))',
+            ])
+        elif isinstance(field.type.element_type, StringType):
+            lines.extend([
+                f'        for item in self._{field.name}:',
+                f'            data = item.encode("utf-8")',
+                f'            buffer.write(struct.pack("<H", len(data)))',
+                f'            buffer.write(data)',
+            ])
+        elif isinstance(field.type.element_type, BytesType):
+            lines.extend([
+                f'        for item in self._{field.name}:',
+                f'            buffer.write(struct.pack("<H", len(item)))',
+                f'            buffer.write(item)',
+            ])
+        elif isinstance(field.type.element_type, StructType):
+            lines.extend([
+                f'        for item in self._{field.name}:',
+                f'            item._write_to_buffer(buffer)',
+            ])
+        elif isinstance(field.type.element_type, EnumType):
+            # Get the enum definition to determine backing type
+            enum_def = self.schema.get_enum(field.type.element_type.name)
+            if enum_def:
+                format_char = self._get_struct_format(enum_def.backing_type)
+                lines.extend([
+                    f'        for item in self._{field.name}:',
+                    f'            buffer.write(struct.pack("<{format_char}", item.to_int()))',
+                ])
+            else:
+                lines.append(f'        # ERROR: Enum {field.type.element_type.name} not found')
+        else:
+            lines.append(f'        # TODO: Unsupported fixed array element type')
+        
+        return lines
+    
+    def _generate_fixed_array_read(self, field: Field) -> List[str]:
+        """Generate read code for fixed-size array types."""
+        lines = [
+            f'        # Fixed array field: [{field.type.size} elements]',
+            f'        self._{field.name} = []',
+            f'        for _ in range({field.type.size}):',
+        ]
+        
+        if isinstance(field.type.element_type, PrimitiveType):
+            format_char = self._get_struct_format(field.type.element_type)
+            size = self._get_type_size(field.type.element_type)
+            lines.append(f'            item = struct.unpack("<{format_char}", buffer.read({size}))[0]')
+        elif isinstance(field.type.element_type, StringType):
+            lines.extend([
+                f'            length = struct.unpack("<H", buffer.read(2))[0]',
+                f'            data = buffer.read(length)',
+                f'            item = data.decode("utf-8")',
+            ])
+        elif isinstance(field.type.element_type, BytesType):
+            lines.extend([
+                f'            length = struct.unpack("<H", buffer.read(2))[0]',
+                f'            item = buffer.read(length)',
+            ])
+        elif isinstance(field.type.element_type, StructType):
+            namespace_prefix = self._get_namespace_prefix()
+            element_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
+            lines.append(f'            item = {element_class}.from_buffer(buffer)')
+        elif isinstance(field.type.element_type, EnumType):
+            # Get the enum definition to determine backing type
+            enum_def = self.schema.get_enum(field.type.element_type.name)
+            if enum_def:
+                namespace_prefix = self._get_namespace_prefix()
+                enum_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
+                format_char = self._get_struct_format(enum_def.backing_type)
+                size = self._get_type_size(enum_def.backing_type)
+                lines.extend([
+                    f'            value = struct.unpack("<{format_char}", buffer.read({size}))[0]',
+                    f'            item = {enum_class}.from_int(value)',
+                ])
+            else:
+                lines.append(f'            # ERROR: Enum {field.type.element_type.name} not found')
+                lines.append(f'            item = None')
+        else:
+            lines.append(f'            # TODO: Unsupported fixed array element type')
+            lines.append(f'            item = None')
+        
+        lines.append(f'            self._{field.name}.append(item)')
+        return lines
+    
     def _generate_struct_write(self, field: Field) -> List[str]:
         """Generate write code for nested struct types."""
         return [f'        self._{field.name}._write_to_buffer(buffer)']
@@ -572,6 +740,32 @@ class PythonCodeGenerator(CodeGenerator):
         struct_class = f'{namespace_prefix}{field.type.name}' if namespace_prefix else field.type.name
         return [f'        self._{field.name} = {struct_class}.from_buffer(buffer)']
     
+    def _generate_enum_write(self, field: Field) -> List[str]:
+        """Generate write code for enum types."""
+        # Get the enum definition to determine backing type
+        enum_def = self.schema.get_enum(field.type.name)
+        if not enum_def:
+            return [f'        # ERROR: Enum {field.type.name} not found']
+        
+        format_char = self._get_struct_format(enum_def.backing_type)
+        return [f'        buffer.write(struct.pack("<{format_char}", self._{field.name}.to_int()))']
+    
+    def _generate_enum_read(self, field: Field) -> List[str]:
+        """Generate read code for enum types."""
+        # Get the enum definition to determine backing type
+        enum_def = self.schema.get_enum(field.type.name)
+        if not enum_def:
+            return [f'        # ERROR: Enum {field.type.name} not found']
+        
+        namespace_prefix = self._get_namespace_prefix()
+        enum_class = f'{namespace_prefix}{field.type.name}' if namespace_prefix else field.type.name
+        format_char = self._get_struct_format(enum_def.backing_type)
+        size = self._get_type_size(enum_def.backing_type)
+        return [
+            f'        value = struct.unpack("<{format_char}", buffer.read({size}))[0]',
+            f'        self._{field.name} = {enum_class}.from_int(value)'
+        ]
+    
     def _get_struct_format(self, type_: Type) -> str:
         """Get struct module format character for a primitive type."""
         if isinstance(type_, PrimitiveType):
@@ -581,6 +775,7 @@ class PythonCodeGenerator(CodeGenerator):
                 'u32': 'I', 'i32': 'i',
                 'u64': 'Q', 'i64': 'q',
                 'f32': 'f', 'f64': 'd',
+                'bool': '?',
             }
             return format_map.get(type_.name, 'B')
         return 'B'
@@ -597,6 +792,25 @@ class PythonCodeGenerator(CodeGenerator):
             if isinstance(field.type, StructType):
                 # For struct fields, call their to_dict method
                 lines.append(f'            "{field.name}": self.{field.name}.to_dict(),')
+            elif isinstance(field.type, EnumType):
+                # For enum fields, convert to integer value
+                lines.append(f'            "{field.name}": self.{field.name}.to_int(),')
+            elif isinstance(field.type, ArrayType):
+                # For array fields, handle element conversion
+                if isinstance(field.type.element_type, StructType):
+                    lines.append(f'            "{field.name}": [item.to_dict() for item in self.{field.name}],')
+                elif isinstance(field.type.element_type, EnumType):
+                    lines.append(f'            "{field.name}": [item.to_int() for item in self.{field.name}],')
+                else:
+                    lines.append(f'            "{field.name}": self.{field.name},')
+            elif isinstance(field.type, FixedArrayType):
+                # For fixed array fields, handle element conversion
+                if isinstance(field.type.element_type, StructType):
+                    lines.append(f'            "{field.name}": [item.to_dict() for item in self.{field.name}],')
+                elif isinstance(field.type.element_type, EnumType):
+                    lines.append(f'            "{field.name}": [item.to_int() for item in self.{field.name}],')
+                else:
+                    lines.append(f'            "{field.name}": self.{field.name},')
             else:
                 lines.append(f'            "{field.name}": self.{field.name},')
         
@@ -625,6 +839,50 @@ class PythonCodeGenerator(CodeGenerator):
                     f'        if "{field.name}" in data and data["{field.name}"] is not None:',
                     f'            kwargs["{field.name}"] = {struct_class}.from_dict(data["{field.name}"])',
                 ])
+            elif isinstance(field.type, EnumType):
+                # For enum fields, create instance from integer value
+                namespace_prefix = self._get_namespace_prefix()
+                enum_class = f'{namespace_prefix}{field.type.name}' if namespace_prefix else field.type.name
+                lines.extend([
+                    f'        if "{field.name}" in data and data["{field.name}"] is not None:',
+                    f'            kwargs["{field.name}"] = {enum_class}.from_int(data["{field.name}"])',
+                ])
+            elif isinstance(field.type, ArrayType):
+                # For array fields, handle element conversion
+                if isinstance(field.type.element_type, StructType):
+                    namespace_prefix = self._get_namespace_prefix()
+                    struct_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
+                    lines.extend([
+                        f'        if "{field.name}" in data and data["{field.name}"] is not None:',
+                        f'            kwargs["{field.name}"] = [{struct_class}.from_dict(item) for item in data["{field.name}"]]',
+                    ])
+                elif isinstance(field.type.element_type, EnumType):
+                    namespace_prefix = self._get_namespace_prefix()
+                    enum_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
+                    lines.extend([
+                        f'        if "{field.name}" in data and data["{field.name}"] is not None:',
+                        f'            kwargs["{field.name}"] = [{enum_class}.from_int(item) for item in data["{field.name}"]]',
+                    ])
+                else:
+                    lines.append(f'        kwargs["{field.name}"] = data.get("{field.name}")')
+            elif isinstance(field.type, FixedArrayType):
+                # For fixed array fields, handle element conversion
+                if isinstance(field.type.element_type, StructType):
+                    namespace_prefix = self._get_namespace_prefix()
+                    struct_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
+                    lines.extend([
+                        f'        if "{field.name}" in data and data["{field.name}"] is not None:',
+                        f'            kwargs["{field.name}"] = [{struct_class}.from_dict(item) for item in data["{field.name}"]]',
+                    ])
+                elif isinstance(field.type.element_type, EnumType):
+                    namespace_prefix = self._get_namespace_prefix()
+                    enum_class = f'{namespace_prefix}{field.type.element_type.name}' if namespace_prefix else field.type.element_type.name
+                    lines.extend([
+                        f'        if "{field.name}" in data and data["{field.name}"] is not None:',
+                        f'            kwargs["{field.name}"] = [{enum_class}.from_int(item) for item in data["{field.name}"]]',
+                    ])
+                else:
+                    lines.append(f'        kwargs["{field.name}"] = data.get("{field.name}")')
             else:
                 lines.append(f'        kwargs["{field.name}"] = data.get("{field.name}")')
         
@@ -651,6 +909,8 @@ class PythonCodeGenerator(CodeGenerator):
                 return 'int'
             elif type_.name in ['f32', 'f64']:
                 return 'float'
+            elif type_.name == 'bool':
+                return 'bool'
         elif isinstance(type_, StringType):
             return 'str'
         elif isinstance(type_, BytesType):
@@ -658,7 +918,13 @@ class PythonCodeGenerator(CodeGenerator):
         elif isinstance(type_, ArrayType):
             element_hint = self._get_python_type_hint(type_.element_type)
             return f'List[{element_hint}]'
+        elif isinstance(type_, FixedArrayType):
+            element_hint = self._get_python_type_hint(type_.element_type)
+            return f'List[{element_hint}]'
         elif isinstance(type_, StructType):
+            namespace_prefix = self._get_namespace_prefix()
+            return f'{namespace_prefix}{type_.name}' if namespace_prefix else type_.name
+        elif isinstance(type_, EnumType):
             namespace_prefix = self._get_namespace_prefix()
             return f'{namespace_prefix}{type_.name}' if namespace_prefix else type_.name
         
@@ -671,16 +937,29 @@ class PythonCodeGenerator(CodeGenerator):
                 return '0'
             elif type_.name in ['f32', 'f64']:
                 return '0.0'
+            elif type_.name == 'bool':
+                return 'False'
         elif isinstance(type_, StringType):
             return '""'
         elif isinstance(type_, BytesType):
             return 'b""'
         elif isinstance(type_, ArrayType):
             return '[]'
+        elif isinstance(type_, FixedArrayType):
+            element_default = self._get_default_value(type_.element_type)
+            return f'[{element_default}] * {type_.size}'
         elif isinstance(type_, StructType):
             namespace_prefix = self._get_namespace_prefix()
             struct_name = f'{namespace_prefix}{type_.name}' if namespace_prefix else type_.name
             return f'{struct_name}()'
+        elif isinstance(type_, EnumType):
+            # Get the first enum value as default
+            enum_def = self.schema.get_enum(type_.name)
+            if enum_def and enum_def.values:
+                namespace_prefix = self._get_namespace_prefix()
+                enum_name = f'{namespace_prefix}{type_.name}' if namespace_prefix else type_.name
+                return f'{enum_name}.{enum_def.values[0].name}'
+            return 'None'
         
         return 'None'
     
@@ -694,6 +973,7 @@ class PythonCodeGenerator(CodeGenerator):
                 'u16': 2, 'i16': 2,
                 'u32': 4, 'i32': 4, 'f32': 4,
                 'u64': 8, 'i64': 8, 'f64': 8,
+                'bool': 1,
             }
             return size_map.get(type_.name, 1)
         elif isinstance(type_, (StringType, BytesType, ArrayType)):

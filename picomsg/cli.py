@@ -161,10 +161,19 @@ def json_info(schema_file: Path, format: str):
         # Collect schema information
         info = {
             'schema_file': str(schema_file),
+            'enums': [],
             'structs': [],
             'messages': [],
-            'total_types': len(schema.structs) + len(schema.messages)
+            'total_types': len(schema.enums) + len(schema.structs) + len(schema.messages)
         }
+        
+        for enum in schema.enums:
+            enum_info = {
+                'name': enum.name,
+                'backing_type': enum.backing_type.name,
+                'values': [{'name': value.name, 'value': value.value} for value in enum.values]
+            }
+            info['enums'].append(enum_info)
         
         for struct in schema.structs:
             struct_info = {
@@ -186,6 +195,14 @@ def json_info(schema_file: Path, format: str):
             click.echo(f"Schema: {schema_file}")
             click.echo(f"Total types: {info['total_types']}")
             click.echo()
+            
+            if info['enums']:
+                click.echo("Enums:")
+                for enum in info['enums']:
+                    click.echo(f"  {enum['name']} : {enum['backing_type']}")
+                    for value in enum['values']:
+                        click.echo(f"    {value['name']} = {value['value']}")
+                click.echo()
             
             if info['structs']:
                 click.echo("Structs:")
@@ -235,6 +252,7 @@ def compile(schema_file: Path, lang: str, output: Path, header_name: str, module
         click.echo(f"Parsed schema: {schema_file}")
         if schema.namespace:
             click.echo(f"Namespace: {schema.namespace.name}")
+        click.echo(f"Enums: {len(schema.enums)}")
         click.echo(f"Structs: {len(schema.structs)}")
         click.echo(f"Messages: {len(schema.messages)}")
         
@@ -282,10 +300,16 @@ def validate(schema_file: Path):
             click.echo(f"  Namespace: {schema.namespace.name}")
         if schema.version is not None:
             click.echo(f"  Version: {schema.version}")
+        click.echo(f"  Enums: {len(schema.enums)}")
         click.echo(f"  Structs: {len(schema.structs)}")
         click.echo(f"  Messages: {len(schema.messages)}")
         
         # Show details
+        if schema.enums:
+            click.echo("\n  Enum definitions:")
+            for enum in schema.enums:
+                click.echo(f"    - {enum.name} : {enum.backing_type.name} ({len(enum.values)} values)")
+        
         if schema.structs:
             click.echo("\n  Struct definitions:")
             for struct in schema.structs:
@@ -320,6 +344,14 @@ def info(schema_file: Path):
         if schema.namespace or schema.version is not None:
             click.echo()
         
+        if schema.enums:
+            click.echo("Enums:")
+            for enum in schema.enums:
+                click.echo(f"  {enum.name} : {enum.backing_type.name}:")
+                for value in enum.values:
+                    click.echo(f"    {value.name} = {value.value}")
+                click.echo()
+        
         if schema.structs:
             click.echo("Structs:")
             for struct in schema.structs:
@@ -342,7 +374,7 @@ def info(schema_file: Path):
 
 def _format_type(type_obj) -> str:
     """Format a type object for display."""
-    from .schema.ast import PrimitiveType, StringType, BytesType, ArrayType, StructType
+    from .schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
     
     if isinstance(type_obj, PrimitiveType):
         return type_obj.name
@@ -352,7 +384,9 @@ def _format_type(type_obj) -> str:
         return "bytes"
     elif isinstance(type_obj, ArrayType):
         return f"[{_format_type(type_obj.element_type)}]"
-    elif isinstance(type_obj, StructType):
+    elif isinstance(type_obj, FixedArrayType):
+        return f"[{_format_type(type_obj.element_type)}:{type_obj.size}]"
+    elif isinstance(type_obj, (StructType, EnumType)):
         return type_obj.name
     else:
         return str(type_obj)

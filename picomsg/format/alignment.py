@@ -3,7 +3,7 @@ Memory alignment utilities for PicoMsg binary format.
 """
 
 from typing import List, Tuple
-from ..schema.ast import Type, Field, Struct, Message, PrimitiveType, StringType, BytesType, ArrayType, StructType
+from ..schema.ast import Type, Field, Struct, Message, PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType
 
 
 def align_offset(offset: int, alignment: int) -> int:
@@ -75,6 +75,12 @@ def _calculate_field_size(type_: Type) -> int:
     
     elif isinstance(type_, ArrayType):
         return 2  # u16 count prefix (actual array data is variable)
+    
+    elif isinstance(type_, FixedArrayType):
+        element_size = type_.element_type.size_bytes()
+        if element_size is None:
+            return 0  # Variable-size elements make the array variable-size
+        return element_size * type_.size
     
     elif isinstance(type_, StructType):
         # For struct references, we need the actual struct definition

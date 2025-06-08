@@ -429,7 +429,7 @@ class TestCLI:
         """Test --version option."""
         result = self.runner.invoke(main, ['--version'])
         assert result.exit_code == 0
-        assert '0.1.2' in result.output
+        assert '0.2.1' in result.output
     
     def test_format_type_function(self):
         """Test the _format_type helper function."""
