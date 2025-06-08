@@ -265,14 +265,63 @@ class TestCLI:
         try:
             result = self.runner.invoke(main, [
                 'compile', str(schema_file),
-                '--lang', 'python'  # Not yet implemented
+                '--lang', 'javascript'  # Not yet implemented
             ])
             
             assert result.exit_code == 1
-            assert "Language 'python' not yet implemented" in result.output
+            assert "Language 'javascript' not yet implemented" in result.output
             
         finally:
             schema_file.unlink()
+
+    def test_compile_command_python_language(self):
+        """Test compile command with Python language."""
+        schema_content = """
+        namespace test.python;
+        
+        struct Point {
+            x: f32;
+            y: f32;
+        }
+        
+        message EchoRequest {
+            point: Point;
+            id: u32;
+        }
+        """
+        
+        schema_file = self.create_test_schema(schema_content)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            try:
+                result = self.runner.invoke(main, [
+                    'compile', str(schema_file),
+                    '--lang', 'python',
+                    '--output', str(temp_path / 'generated'),
+                    '--module-name', 'test_module'
+                ])
+                
+                assert result.exit_code == 0
+                assert "Generating Python code with module name: test_module" in result.output
+                assert "Generated 1 files" in result.output
+                
+                # Check output directory was created
+                output_dir = temp_path / 'generated'
+                assert output_dir.exists()
+                assert (output_dir / 'test_module.py').exists()
+                
+                # Check basic Python content
+                python_content = (output_dir / 'test_module.py').read_text()
+                assert "import struct" in python_content
+                assert "import json" in python_content
+                assert "class TestPythonPoint(TestPythonBase):" in python_content
+                assert "class TestPythonEchoRequest(TestPythonBase):" in python_content
+                assert "class TestPythonError(Exception):" in python_content
+                
+            finally:
+                schema_file.unlink()
 
     def test_compile_command_rust_language(self):
         """Test compile command with Rust language."""
