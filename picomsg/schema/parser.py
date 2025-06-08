@@ -28,7 +28,7 @@ PICOMSG_GRAMMAR = r"""
     version_decl: "version" NUMBER ";"
 
     enum_decl: "enum" NAME ":" primitive_type "{" enum_value_decl* "}"
-    enum_value_decl: NAME ["=" NUMBER] ","?
+    enum_value_decl: NAME ["=" (NUMBER | HEX_NUMBER)] ","?
 
     struct_decl: "struct" NAME "{" field_decl* "}"
     message_decl: "message" NAME "{" field_decl* "}"
@@ -36,6 +36,7 @@ PICOMSG_GRAMMAR = r"""
     field_decl: NAME ":" type ["=" default_value] ";"
     
     default_value: NUMBER
+                 | HEX_NUMBER
                  | NEGATIVE_NUMBER
                  | FLOAT
                  | NEGATIVE_FLOAT
@@ -77,6 +78,7 @@ PICOMSG_GRAMMAR = r"""
     QUALIFIED_NAME: NAME ("." NAME)*
     NAME: /[a-zA-Z_][a-zA-Z0-9_]*/
     NUMBER: /[0-9]+/
+    HEX_NUMBER: /0x[0-9a-fA-F]+/
     NEGATIVE_NUMBER: /-[0-9]+/
     FLOAT: /[0-9]+\.[0-9]+/
     NEGATIVE_FLOAT: /-[0-9]+\.[0-9]+/
@@ -207,6 +209,9 @@ class SchemaTransformer(Transformer):
     
     def NUMBER(self, token):
         return int(token)
+    
+    def HEX_NUMBER(self, token):
+        return int(token, 16)
     
     def NEGATIVE_NUMBER(self, token):
         return int(token)

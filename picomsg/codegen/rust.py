@@ -5,7 +5,7 @@ Rust code generator for PicoMsg.
 from typing import Dict, List
 from ..schema.ast import (
     Schema, Struct, Message, Field, Type,
-    PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType
+    PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
 )
 from .base import CodeGenerator
 
@@ -45,6 +45,11 @@ class RustCodeGenerator(CodeGenerator):
         # Generate error types
         lines.extend(self._generate_error_types())
         lines.append("")
+        
+        # Generate enum definitions
+        for enum in self.schema.enums:
+            lines.extend(self._generate_enum_definition(enum))
+            lines.append("")
         
         # Generate struct definitions
         for struct in self.schema.structs:
@@ -139,6 +144,59 @@ class RustCodeGenerator(CodeGenerator):
             "",
             f"pub type {result_name}<T> = Result<T, {error_name}>;",
         ]
+        
+        return lines
+    
+    def _generate_enum_definition(self, enum) -> List[str]:
+        """Generate Rust enum definition."""
+        from ..schema.ast import Enum
+        namespace_prefix = self._get_namespace_prefix()
+        enum_name = f"{namespace_prefix}{enum.name}" if namespace_prefix else enum.name
+        
+        # Get the backing type
+        backing_type_map = {
+            'u8': 'u8', 'u16': 'u16', 'u32': 'u32', 'u64': 'u64',
+            'i8': 'i8', 'i16': 'i16', 'i32': 'i32', 'i64': 'i64'
+        }
+        backing_type = backing_type_map.get(enum.backing_type.name, 'u32')
+        
+        lines = [
+            f"/// Enum: {enum.name}",
+            "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]",
+            "#[repr(" + backing_type + ")]",
+            f"pub enum {enum_name} {{",
+        ]
+        
+        # Generate enum values
+        for value in enum.values:
+            lines.append(f"    {value.name} = {value.value},")
+        
+        lines.append("}")
+        
+        # Generate conversion methods
+        lines.extend([
+            "",
+            f"impl {enum_name} {{",
+            f"    /// Convert from {backing_type} value",
+            f"    pub fn from_{backing_type}(value: {backing_type}) -> Option<Self> {{",
+            "        match value {",
+        ])
+        
+        # Generate match arms for each enum value
+        for value in enum.values:
+            lines.append(f"            {value.value} => Some(Self::{value.name}),")
+        
+        lines.extend([
+            "            _ => None,",
+            "        }",
+            "    }",
+            "",
+            f"    /// Convert to {backing_type} value",
+            f"    pub fn to_{backing_type}(self) -> {backing_type} {{",
+            "        self as " + backing_type,
+            "    }",
+            "}",
+        ])
         
         return lines
     
@@ -306,6 +364,8 @@ class RustCodeGenerator(CodeGenerator):
             return self._generate_fixed_array_read(field, indent)
         elif isinstance(field.type, StructType):
             return self._generate_struct_read(field, indent)
+        elif isinstance(field.type, EnumType):
+            return self._generate_enum_read(field, indent)
         else:
             return [f"{indent}{field.name}: Default::default(), // TODO: Unsupported type"]
     
@@ -323,6 +383,8 @@ class RustCodeGenerator(CodeGenerator):
             return self._generate_fixed_array_write(field, indent)
         elif isinstance(field.type, StructType):
             return self._generate_struct_write(field, indent)
+        elif isinstance(field.type, EnumType):
+            return self._generate_enum_write(field, indent)
         else:
             return [f"{indent}// TODO: Unsupported type for field {field.name}"]
     
@@ -562,6 +624,40 @@ class RustCodeGenerator(CodeGenerator):
         """Generate code to write a struct field."""
         return [f"{indent}self.{field.name}.to_writer(writer)?;"]
     
+    def _generate_enum_read(self, field: Field, indent: str) -> List[str]:
+        """Generate code to read an enum field."""
+        namespace_prefix = self._get_namespace_prefix()
+        enum_type = f"{namespace_prefix}{field.type.name}" if namespace_prefix else field.type.name
+        error_name = f"{namespace_prefix}Error" if namespace_prefix else "PicoMsgError"
+        
+        # Get the enum definition to determine backing type
+        enum_def = self.schema.get_enum(field.type.name)
+        if enum_def:
+            backing_type = enum_def.backing_type.name
+            read_expr = self._get_primitive_read_expr(enum_def.backing_type)
+        else:
+            backing_type = "u8"
+            read_expr = "reader.read_u8()?"
+        
+        return [
+            f"{indent}{field.name}: {{",
+            f"{indent}    let value = {read_expr};",
+            f"{indent}    {enum_type}::from_{backing_type}(value).ok_or({error_name}::InvalidData)?",
+            f"{indent}}},",
+        ]
+    
+    def _generate_enum_write(self, field: Field, indent: str) -> List[str]:
+        """Generate code to write an enum field."""
+        # Get the enum definition to determine backing type
+        enum_def = self.schema.get_enum(field.type.name)
+        if enum_def:
+            backing_type = enum_def.backing_type.name
+            write_method = self._get_primitive_write_expr(enum_def.backing_type, f"self.{field.name}.to_{backing_type}()")
+        else:
+            write_method = f"writer.write_u8(self.{field.name}.to_u8())?;"
+        
+        return [f"{indent}{write_method}"]
+    
     def _get_primitive_read_expr(self, prim_type: PrimitiveType) -> str:
         """Get the read expression for a primitive type."""
         type_name = prim_type.name
@@ -623,6 +719,9 @@ class RustCodeGenerator(CodeGenerator):
                 # For complex types, use Vec for now (Rust arrays with complex types are tricky)
                 return f"Vec<{element_type}>"
         elif isinstance(type_, StructType):
+            namespace_prefix = self._get_namespace_prefix()
+            return f"{namespace_prefix}{type_.name}" if namespace_prefix else type_.name
+        elif isinstance(type_, EnumType):
             namespace_prefix = self._get_namespace_prefix()
             return f"{namespace_prefix}{type_.name}" if namespace_prefix else type_.name
         else:

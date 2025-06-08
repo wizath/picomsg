@@ -5,6 +5,32 @@ All notable changes to PicoMsg will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.2] - 2024-12-19
+
+### 🔧 **Bug Fixes and Improvements**
+
+#### Enum Generation Enhancements
+- **Hexadecimal enum parsing**: Fixed parser to support hexadecimal enum values (0x01, 0x02, etc.)
+- **Rust enum generation**: Implemented missing enum code generation for Rust target language
+- **Enum conversion methods**: Added `from_u8()` and `to_u8()` methods for Rust enums
+- **Cross-language enum support**: Ensured consistent enum handling across C, Python, and Rust
+
+#### Parser Improvements
+- **HEX_NUMBER token**: Added support for hexadecimal number literals in schema grammar
+- **Mixed enum values**: Support for mixing decimal and hexadecimal values in same enum
+- **Large hex values**: Support for hexadecimal values up to 0xFFFFFFFF
+
+#### Code Generation Quality
+- **Rust enum attributes**: Added proper derive attributes for Debug, Clone, Copy, PartialEq, Eq, Hash
+- **Serialization support**: Added Serialize and Deserialize derives for JSON compatibility
+- **Repr attributes**: Added appropriate repr attributes for enum backing types
+- **Type safety**: Enhanced type checking and validation in generated code
+
+#### Testing Infrastructure
+- **End-to-end enum tests**: Added comprehensive tests for enum generation and compilation
+- **Real compilation testing**: Tests now verify that generated code actually compiles and runs
+- **Cross-language validation**: Ensured enum functionality works identically across all target languages
+
 ## [0.4.1] - 2024-12-19
 
 ### 🔧 **Code Quality Improvements**
