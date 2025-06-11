@@ -35,6 +35,7 @@ class RustCodeGenerator(CodeGenerator):
             "use serde::{Deserialize, Serialize};",
             "use std::io::{Read, Write};",
             "use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};",
+            "use base64::{Engine as _, engine::general_purpose};",
             "",
         ]
         
@@ -253,6 +254,8 @@ class RustCodeGenerator(CodeGenerator):
             f"    fn to_bytes(&self) -> {result_type}<Vec<u8>>;",
             f"    fn from_reader<R: Read>(reader: &mut R) -> {result_type}<Self> where Self: Sized;",
             f"    fn to_writer<W: Write>(&self, writer: &mut W) -> {result_type}<()>;",
+            f"    fn to_base64(&self) -> {result_type}<String>;",
+            f"    fn from_base64(base64_str: &str) -> {result_type}<Self> where Self: Sized;",
             "}",
         ]
         
@@ -264,6 +267,7 @@ class RustCodeGenerator(CodeGenerator):
         struct_name = f"{namespace_prefix}{struct.name}" if namespace_prefix else struct.name
         trait_name = f"{namespace_prefix}Serialize" if namespace_prefix else "PicoMsgSerialize"
         result_type = f"{namespace_prefix}Result" if namespace_prefix else "PicoMsgResult"
+        error_name = f"{namespace_prefix}Error" if namespace_prefix else "PicoMsgError"
         
         lines = [
             f"impl {trait_name} for {struct_name} {{",
@@ -299,6 +303,17 @@ class RustCodeGenerator(CodeGenerator):
         lines.extend([
             "        Ok(())",
             "    }",
+            "",
+            f"    fn to_base64(&self) -> {result_type}<String> {{",
+            "        let bytes = self.to_bytes()?;",
+            "        Ok(general_purpose::STANDARD.encode(&bytes))",
+            "    }",
+            "",
+            f"    fn from_base64(base64_str: &str) -> {result_type}<Self> {{",
+            "        let bytes = general_purpose::STANDARD.decode(base64_str)",
+            f"            .map_err(|_| {error_name}::InvalidData)?;",
+            "        Self::from_bytes(&bytes)",
+            "    }",
             "}",
         ])
         
@@ -310,6 +325,7 @@ class RustCodeGenerator(CodeGenerator):
         message_name = f"{namespace_prefix}{message.name}" if namespace_prefix else message.name
         trait_name = f"{namespace_prefix}Serialize" if namespace_prefix else "PicoMsgSerialize"
         result_type = f"{namespace_prefix}Result" if namespace_prefix else "PicoMsgResult"
+        error_name = f"{namespace_prefix}Error" if namespace_prefix else "PicoMsgError"
         
         lines = [
             f"impl {trait_name} for {message_name} {{",
@@ -344,6 +360,17 @@ class RustCodeGenerator(CodeGenerator):
         
         lines.extend([
             "        Ok(())",
+            "    }",
+            "",
+            f"    fn to_base64(&self) -> {result_type}<String> {{",
+            "        let bytes = self.to_bytes()?;",
+            "        Ok(general_purpose::STANDARD.encode(&bytes))",
+            "    }",
+            "",
+            f"    fn from_base64(base64_str: &str) -> {result_type}<Self> {{",
+            "        let bytes = general_purpose::STANDARD.decode(base64_str)",
+            f"            .map_err(|_| {error_name}::InvalidData)?;",
+            "        Self::from_bytes(&bytes)",
             "    }",
             "}",
         ])

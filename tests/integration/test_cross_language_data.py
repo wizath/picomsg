@@ -465,6 +465,7 @@ path = "generate.rs"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 byteorder = "1.4"
+base64 = "0.21"
 '''
             (rust_dir / "Cargo.toml").write_text(cargo_toml)
             
@@ -600,6 +601,7 @@ path = "validate.rs"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 byteorder = "1.4"
+base64 = "0.21"
 '''
             (rust_dir / "Cargo.toml").write_text(cargo_toml)
             
@@ -676,6 +678,7 @@ path = "rust_generate.rs"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 byteorder = "1.4"
+base64 = "0.21"
 '''
             (rust_dir / "Cargo.toml").write_text(cargo_toml)
             

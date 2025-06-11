@@ -84,6 +84,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 byteorder = "1.4"
+base64 = "0.21"
 '''
             (rust_dir / "Cargo.toml").write_text(cargo_toml)
             
@@ -290,6 +291,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 byteorder = "1.4"
+base64 = "0.21"
 '''
             (rust_dir / "Cargo.toml").write_text(cargo_toml)
             

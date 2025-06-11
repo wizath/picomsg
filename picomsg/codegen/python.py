@@ -34,6 +34,7 @@ class PythonCodeGenerator(CodeGenerator):
             '',
             'import struct',
             'import json',
+            'import base64',
             'from enum import IntEnum',
             'from typing import Dict, Any, Optional, Union, List',
             'from io import BytesIO',
@@ -191,6 +192,16 @@ class PythonCodeGenerator(CodeGenerator):
             '        """Create instance from JSON string."""',
             '        data = json.loads(json_str)',
             '        return cls.from_dict(data)',
+            '    ',
+            '    def to_base64(self) -> str:',
+            '        """Convert to base64 encoded string."""',
+            '        return base64.b64encode(self.to_bytes()).decode("ascii")',
+            '    ',
+            '    @classmethod',
+            '    def from_base64(cls, base64_str: str) -> "Self":',
+            '        """Create instance from base64 encoded string."""',
+            '        data = base64.b64decode(base64_str.encode("ascii"))',
+            '        return cls.from_bytes(data)',
         ]
         
         return lines
