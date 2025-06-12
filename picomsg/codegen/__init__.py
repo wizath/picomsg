@@ -8,6 +8,7 @@ from .rust import RustCodeGenerator
 from .python import PythonCodeGenerator
 from .rust_json import RustJsonCodeGenerator
 from .python_json import PythonJsonCodeGenerator
+from .typescript import TypeScriptCodeGenerator
 
 __all__ = [
     "CodeGenerator",
@@ -16,4 +17,5 @@ __all__ = [
     "PythonCodeGenerator",
     "RustJsonCodeGenerator",
     "PythonJsonCodeGenerator",
+    "TypeScriptCodeGenerator",
 ] 

@@ -1,0 +1,41 @@
+export class {{ struct.name }} extends {{ base_class }} {
+  {% for field in struct.fields %}
+  {{ field.name }}: {{ field.type | ts_type }} = {{ field.type | ts_default_with_schema }};
+  {% endfor %}
+
+  constructor(data?: Partial<{{ struct.name }}>) {
+    super();
+    {% for field in struct.fields %}
+    this.{{ field.name }} = data?.{{ field.name }} ?? {{ field.type | ts_default_with_schema }};
+    {% endfor %}
+  }
+
+  toBytes(): Uint8Array {
+    const buffer: number[] = [];
+    {% for field in struct.fields %}
+    {% include 'typescript/field_write.ts.j2' %}
+    {% endfor %}
+    return new Uint8Array(buffer);
+  }
+
+  fromBytes(data: Uint8Array): void {
+    let offset = 0;
+    {% for field in struct.fields %}
+    {% include 'typescript/field_read.ts.j2' %}
+    {% endfor %}
+  }
+
+  toJSON(): any {
+    return {
+      {% for field in struct.fields %}
+      {{ field.name }}: this.{{ field.name }},
+      {% endfor %}
+    };
+  }
+
+  fromJSON(data: any): void {
+    {% for field in struct.fields %}
+    this.{{ field.name }} = data.{{ field.name }} ?? {{ field.type | ts_default_with_schema }};
+    {% endfor %}
+  }
+} 

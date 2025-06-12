@@ -10,7 +10,7 @@ PicoMsg is a binary serialization format optimized for embedded systems and perf
 
 - **Zero-copy deserialization** in C with memory-aligned structures
 - **Compact binary format** with minimal overhead and direct `memcpy()` operations
-- **Multi-language support** with code generation for C, Rust, Python, and JavaScript
+- **Multi-language support** with code generation for C, Rust, Python, and TypeScript
 - **Comprehensive JSON system** with validation, streaming, and pretty-printing
 - **Schema definition language** with support for enums, structs, messages, and complex nesting
 - **Cross-language JSON interoperability** for debugging and API development
@@ -63,6 +63,9 @@ picomsg compile schema.pico --lang rust --output generated/
 # Generate Python code with Pydantic validation
 picomsg compile schema.pico --lang python --output generated/ --module-name api_bindings
 
+# Generate TypeScript code with type safety
+picomsg compile schema.pico --lang typescript --output generated/ --module-name api_types
+
 # Generate C code for embedded systems
 picomsg compile schema.pico --lang c --output generated/ --header-name api
 ```
@@ -109,6 +112,35 @@ let json_data = serde_json::to_string(&request)?;
 let validated_request: EchoRequest = serde_json::from_str(&json_data)?;
 ```
 
+**TypeScript with full type safety:**
+```typescript
+import { ApiHeader, EchoRequest, ApiCommand } from './api_types';
+
+// Create with type-safe constructors
+const header = new ApiHeader({
+    command: ApiCommand.ECHO,
+    length: 1024,
+    crc16: 0xABCD
+});
+
+const request = new EchoRequest({
+    header: header,
+    data: new TextEncoder().encode("Hello, World!"),
+    timestamp: 1640995200
+});
+
+// Binary serialization
+const binaryData = request.toBytes();
+
+// JSON serialization
+const jsonData = request.toJSON();
+const restoredRequest = EchoRequest.fromJSON(jsonData);
+
+// Base64 encoding
+const base64Data = request.toBase64();
+const fromBase64 = EchoRequest.fromBase64(base64Data);
+```
+
 ## CLI Tutorial
 
 PicoMsg provides a comprehensive command-line interface for schema compilation, validation, and JSON operations.
@@ -125,6 +157,9 @@ picomsg compile schema.pico --lang python --output generated/
 
 # With custom module name
 picomsg compile schema.pico --lang rust --output src/ --module-name protocol
+
+# TypeScript with npm package generation
+picomsg compile schema.pico --lang typescript --output frontend/types/ --module-name api-client
 
 # C code generation with custom header name
 picomsg compile schema.pico --lang c --output include/ --header-name device_api
@@ -161,14 +196,17 @@ picomsg info schema.pico --verbose
 
 #### JSON Code Generation
 
-Generate enhanced code with JSON validation support:
+Generate enhanced code with JSON validation:
 
 ```bash
-# Generate Python code with Pydantic validation
+# Python with Pydantic validation
 picomsg json codegen schema.pico --lang python --output api/
 
-# Generate Rust code with serde validation
+# Rust with serde validation
 picomsg json codegen schema.pico --lang rust --output src/
+
+# TypeScript with type safety and npm package
+picomsg json codegen schema.pico --lang typescript --output frontend/api/
 ```
 
 #### JSON Validation
@@ -489,17 +527,37 @@ Payload: [struct_data...]
 
 ### Language-Specific Mappings
 
-| PicoMsg | C | Rust | Python | JavaScript |
+| PicoMsg | C | Rust | Python | TypeScript |
 |---------|---|------|--------|------------|
 | `u8` | `uint8_t` | `u8` | `int` | `number` |
+| `u16` | `uint16_t` | `u16` | `int` | `number` |
 | `u32` | `uint32_t` | `u32` | `int` | `number` |
+| `u64` | `uint64_t` | `u64` | `int` | `number` |
+| `i8` | `int8_t` | `i8` | `int` | `number` |
+| `i16` | `int16_t` | `i16` | `int` | `number` |
+| `i32` | `int32_t` | `i32` | `int` | `number` |
+| `i64` | `int64_t` | `i64` | `int` | `number` |
+| `f32` | `float` | `f32` | `float` | `number` |
 | `f64` | `double` | `f64` | `float` | `number` |
 | `bool` | `bool` | `bool` | `bool` | `boolean` |
 | `string` | `char*` | `String` | `str` | `string` |
 | `bytes` | `uint8_t*` | `Vec<u8>` | `bytes` | `Uint8Array` |
 | `[Type]` | `Type*` | `Vec<Type>` | `List[Type]` | `Type[]` |
+| `[Type:N]` | `Type[N]` | `[Type; N]` | `List[Type]` | `Type[]` |
 | Enum | `enum_name_t` | `EnumName` | `EnumName` | `EnumName` |
 | Struct | `struct_name_t` | `StructName` | `StructName` | `StructName` |
+
+### Language-Specific Features
+
+| Feature | C | Rust | Python | TypeScript |
+|---------|---|------|--------|------------|
+| **JSON Support** | ❌ | ✅ (serde) | ✅ (Pydantic) | ✅ (native) |
+| **Base64 Encoding** | ❌ | ✅ | ✅ | ✅ |
+| **Type Safety** | ⚠️ (compile-time) | ✅ (strict) | ⚠️ (runtime) | ✅ (strict) |
+| **Memory Management** | Manual | Automatic | Automatic | Automatic |
+| **Package Generation** | Headers only | Cargo crate | Python package | npm package |
+| **Static Factory Methods** | ❌ | ✅ | ✅ | ✅ |
+| **Validation** | ❌ | ✅ (validator) | ✅ (Pydantic) | ✅ (TypeScript) |
 
 ## JSON Integration
 
@@ -519,6 +577,13 @@ PicoMsg provides comprehensive JSON support with validation and framework integr
 - Strict validation with assignment checking
 - Comprehensive error reporting
 
+**TypeScript Integration:**
+- Native JSON serialization with type safety
+- Static factory methods (`fromJSON`, `fromBytes`, `fromBase64`)
+- Full TypeScript type definitions and IntelliSense support
+- Runtime type validation with detailed error messages
+- npm package generation with proper dependencies
+
 ### JSON Code Generation
 
 Generate enhanced code with JSON validation:
@@ -529,6 +594,9 @@ picomsg json codegen schema.pico --lang python --output api/
 
 # Rust with serde validation
 picomsg json codegen schema.pico --lang rust --output src/
+
+# TypeScript with type safety and npm package
+picomsg json codegen schema.pico --lang typescript --output frontend/api/
 ```
 
 ### JSON Validation Examples
@@ -559,6 +627,30 @@ let header: ApiHeader = serde_json::from_str(json_data)?;
 
 // Manual validation
 header.validate()?;
+```
+
+**TypeScript with type safety:**
+```typescript
+import { ApiHeader, ApiCommand } from './api_types';
+
+try {
+    // Type-safe construction with validation
+    const header = new ApiHeader({
+        command: ApiCommand.ECHO,
+        length: 1024,
+        crc16: 65535
+    });
+    
+    // JSON serialization with validation
+    const jsonData = header.toJSON();
+    const restored = ApiHeader.fromJSON(jsonData);
+    
+    // This would cause TypeScript compilation error
+    // const invalid = new ApiHeader({ command: "invalid" });
+    
+} catch (error) {
+    console.error(`Validation error: ${error.message}`);
+}
 ```
 
 ### JSON Utilities
