@@ -14,6 +14,7 @@ from picomsg.schema.parser import SchemaParser
 from picomsg.codegen.python import PythonCodeGenerator
 from picomsg.codegen.c import CCodeGenerator
 from picomsg.codegen.rust import RustCodeGenerator
+from .common_schemas import IntegrationSchemas, load_schema
 
 
 class TestCrossLanguageEnums:
@@ -31,34 +32,8 @@ class TestCrossLanguageEnums:
     
     def test_enum_python_to_python_roundtrip(self):
         """Test enum serialization/deserialization within Python."""
-        schema_text = """
-        namespace test.enums;
-        
-        enum Priority : u8 {
-            Low = 1,
-            Medium = 5,
-            High = 10,
-        }
-        
-        enum Status : u16 {
-            Inactive,
-            Active = 100,
-            Pending,
-            Complete = 1000,
-        }
-        
-        struct Task {
-            id: u32;
-            name: string;
-            priority: Priority;
-            status: Status;
-        }
-        """
-        
-        # Generate Python code
-        self.schema_file.write_text(schema_text)
-        parser = SchemaParser()
-        schema = parser.parse_file(self.schema_file)
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.CROSS_LANGUAGE_ENUMS)
         
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
@@ -112,26 +87,8 @@ class TestCrossLanguageEnums:
     
     def test_enum_binary_format_consistency(self):
         """Test that enum binary format is consistent and predictable."""
-        schema_text = """
-        namespace test.binary;
-        
-        enum Color : u8 {
-            Red = 1,
-            Green = 2,
-            Blue = 3,
-        }
-        
-        struct Pixel {
-            x: u16;
-            y: u16;
-            color: Color;
-        }
-        """
-        
-        # Generate Python code
-        self.schema_file.write_text(schema_text)
-        parser = SchemaParser()
-        schema = parser.parse_file(self.schema_file)
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.BINARY_FORMAT)
         
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
@@ -188,37 +145,8 @@ class TestCrossLanguageFixedArrays:
     
     def test_fixed_array_python_roundtrip(self):
         """Test fixed array serialization/deserialization within Python."""
-        schema_text = """
-        namespace test.arrays;
-        
-        enum Direction : u8 {
-            North,
-            East,
-            South,
-            West,
-        }
-        
-        struct Vector3 {
-            coords: [f32:3];
-        }
-        
-        struct Transform {
-            position: [f64:3];
-            rotation: [f32:4];  // quaternion
-            scale: [f32:3];
-        }
-        
-        struct GameState {
-            player_positions: [Vector3:4];
-            directions: [Direction:4];
-            scores: [u32:4];
-        }
-        """
-        
-        # Generate Python code
-        self.schema_file.write_text(schema_text)
-        parser = SchemaParser()
-        schema = parser.parse_file(self.schema_file)
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.FIXED_ARRAYS)
         
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
@@ -286,18 +214,8 @@ class TestCrossLanguageFixedArrays:
     
     def test_fixed_array_binary_format_consistency(self):
         """Test that fixed array binary format is consistent."""
-        schema_text = """
-        namespace test.binary;
-        
-        struct IntArray {
-            values: [u32:3];
-        }
-        """
-        
-        # Generate Python code
-        self.schema_file.write_text(schema_text)
-        parser = SchemaParser()
-        schema = parser.parse_file(self.schema_file)
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.BINARY_FORMAT)
         
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
@@ -346,62 +264,8 @@ class TestCrossLanguageComprehensive:
     
     def test_comprehensive_schema_python_roundtrip(self):
         """Test a comprehensive schema with all features in Python."""
-        schema_text = """
-        namespace test.comprehensive;
-        
-        enum MessageType : u8 {
-            Ping = 1,
-            Pong = 2,
-            Data = 10,
-            Error = 255,
-        }
-        
-        enum Priority : u16 {
-            Low,
-            Normal = 100,
-            High,
-            Critical = 1000,
-        }
-        
-        struct Point3D {
-            x: f32;
-            y: f32;
-            z: f32;
-        }
-        
-        struct Color {
-            rgba: [u8:4];
-        }
-        
-        struct Metadata {
-            tags: [string:3];
-            values: [f64:2];
-            flags: [bool:4];
-        }
-        
-        struct ComplexData {
-            id: u64;
-            type: MessageType;
-            priority: Priority;
-            timestamp: u64;
-            position: Point3D;
-            color: Color;
-            metadata: Metadata;
-            points: [Point3D:5];
-            priorities: [Priority:3];
-        }
-        
-        message ComplexMessage {
-            header_id: u32;
-            data: ComplexData;
-            checksum: u32;
-        }
-        """
-        
-        # Generate Python code
-        self.schema_file.write_text(schema_text)
-        parser = SchemaParser()
-        schema = parser.parse_file(self.schema_file)
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.COMPREHENSIVE)
         
         generator = PythonCodeGenerator(schema)
         files = generator.generate()

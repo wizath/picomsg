@@ -1,0 +1,14 @@
+namespace types;
+
+enum Status: u8 {
+    ACTIVE = 1,
+    INACTIVE = 2,
+    PENDING = 3
+}
+
+struct TypedData {
+    id: u32;
+    name: string;
+    status: Status;
+    values: [f32];
+} 

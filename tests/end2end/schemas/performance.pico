@@ -1,0 +1,13 @@
+namespace perf;
+
+message DataPoint {
+    timestamp: u64;
+    value: f64;
+    label: string;
+}
+
+message Dataset {
+    name: string;
+    points: [DataPoint];
+    metadata: string;
+} 

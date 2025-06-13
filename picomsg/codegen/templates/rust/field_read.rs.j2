@@ -1,0 +1,85 @@
+{% if field.type.name == 'u8' %}
+            {{ field.name }}: reader.read_u8()?,
+{% elif field.type.name == 'i8' %}
+            {{ field.name }}: reader.read_i8()?,
+{% elif field.type.name == 'u16' %}
+            {{ field.name }}: reader.read_u16::<LittleEndian>()?,
+{% elif field.type.name == 'i16' %}
+            {{ field.name }}: reader.read_i16::<LittleEndian>()?,
+{% elif field.type.name == 'u32' %}
+            {{ field.name }}: reader.read_u32::<LittleEndian>()?,
+{% elif field.type.name == 'i32' %}
+            {{ field.name }}: reader.read_i32::<LittleEndian>()?,
+{% elif field.type.name == 'u64' %}
+            {{ field.name }}: reader.read_u64::<LittleEndian>()?,
+{% elif field.type.name == 'i64' %}
+            {{ field.name }}: reader.read_i64::<LittleEndian>()?,
+{% elif field.type.name == 'f32' %}
+            {{ field.name }}: reader.read_f32::<LittleEndian>()?,
+{% elif field.type.name == 'f64' %}
+            {{ field.name }}: reader.read_f64::<LittleEndian>()?,
+{% elif field.type.name == 'bool' %}
+            {{ field.name }}: reader.read_u8()? != 0,
+{% elif field.type.__class__.__name__ == 'StringType' %}
+            {{ field.name }}: {
+                let len = reader.read_u16::<LittleEndian>()? as usize;
+                let mut buf = vec![0u8; len];
+                reader.read_exact(&mut buf)?;
+                String::from_utf8(buf).map_err(|_| {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::InvalidData)?
+            },
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+            {{ field.name }}: {
+                let len = reader.read_u16::<LittleEndian>()? as usize;
+                let mut buf = vec![0u8; len];
+                reader.read_exact(&mut buf)?;
+                buf
+            },
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+            {{ field.name }}: {
+                let count = reader.read_u16::<LittleEndian>()? as usize;
+                let mut vec = Vec::with_capacity(count);
+                for _ in 0..count {
+{% if field.type.element_type.name in ['u8', 'i8', 'u16', 'i16', 'u32', 'i32', 'u64', 'i64', 'f32', 'f64', 'bool'] %}
+                    vec.push({{ field.type.element_type | rust_read_expr }});
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+                    let len = reader.read_u16::<LittleEndian>()? as usize;
+                    let mut buf = vec![0u8; len];
+                    reader.read_exact(&mut buf)?;
+                    vec.push(String::from_utf8(buf).map_err(|_| {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::InvalidData)?);
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+                    let len = reader.read_u16::<LittleEndian>()? as usize;
+                    let mut buf = vec![0u8; len];
+                    reader.read_exact(&mut buf)?;
+                    vec.push(buf);
+{% else %}
+                    vec.push({{ field.type.element_type | rust_type_with_namespace(namespace_prefix) }}::from_reader(reader)?);
+{% endif %}
+                }
+                vec
+            },
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+            {{ field.name }}: {
+{% if field.type.element_type.name in ['u8', 'i8', 'u16', 'i16', 'u32', 'i32', 'u64', 'i64', 'f32', 'f64', 'bool'] %}
+                let mut arr = [{{ field.type.element_type | rust_type }}::default(); {{ field.type.size }}];
+                for i in 0..{{ field.type.size }} {
+                    arr[i] = {{ field.type.element_type | rust_read_expr }};
+                }
+                arr
+{% else %}
+                let mut vec = Vec::with_capacity({{ field.type.size }});
+                for _ in 0..{{ field.type.size }} {
+                    vec.push({{ field.type.element_type | rust_type_with_namespace(namespace_prefix) }}::from_reader(reader)?);
+                }
+                vec
+{% endif %}
+            },
+{% elif field.type.__class__.__name__ == 'StructType' %}
+            {{ field.name }}: {{ namespace_prefix }}{{ field.type.name }}::from_reader(reader)?,
+{% elif field.type.__class__.__name__ == 'EnumType' %}
+            {{ field.name }}: {
+                let value = {{ field.type | rust_enum_backing_read }};
+                {{ namespace_prefix }}{{ field.type.name }}::from_{{ field.type | rust_enum_backing_type }}(value).ok_or({{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::InvalidData)?
+            },
+{% else %}
+            {{ field.name }}: Default::default(), // TODO: Unsupported type
+{% endif %} 

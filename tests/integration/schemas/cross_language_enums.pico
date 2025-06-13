@@ -1,0 +1,21 @@
+namespace test.enums;
+
+enum Priority : u8 {
+    Low = 1,
+    Medium = 5,
+    High = 10,
+}
+
+enum Status : u16 {
+    Inactive,
+    Active = 100,
+    Pending,
+    Complete = 1000,
+}
+
+struct Task {
+    id: u32;
+    name: string;
+    priority: Priority;
+    status: Status;
+} 

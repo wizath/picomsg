@@ -20,6 +20,7 @@ from picomsg.schema.parser import SchemaParser
 from picomsg.codegen.c import CCodeGenerator
 from picomsg.codegen.rust import RustCodeGenerator
 from picomsg.codegen.python import PythonCodeGenerator
+from .common_schemas import IntegrationSchemas, load_schema, IntegrationTestData
 
 
 class TestDataTypes:
@@ -69,148 +70,63 @@ class TestDataTypes:
     
     def test_all_primitive_types(self):
         """Test all primitive types with cross-platform compatibility."""
-        schema_content = """
-        namespace test.primitives;
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.ALL_PRIMITIVES)
         
-        struct AllPrimitives {
-            u8_field: u8;
-            u16_field: u16;
-            u32_field: u32;
-            u64_field: u64;
-            i8_field: i8;
-            i16_field: i16;
-            i32_field: i32;
-            i64_field: i64;
-            f32_field: f32;
-            f64_field: f64;
-        }
-        """
+        # Generate code for all languages
+        temp_dir = self.create_temp_dir()
+        python_dir = temp_dir / "python_generated"
+        python_dir.mkdir(exist_ok=True)
+        python_generator = PythonCodeGenerator(schema)
+        python_files = python_generator.generate()
+        for filename, content in python_files.items():
+            (python_dir / filename).write_text(content)
         
-        schema_file = self.create_schema_file(schema_content)
-        lang_dirs = self.generate_all_languages(schema_file)
+        lang_dirs = {'python': python_dir}
         
-        # Test data with edge cases
-        test_cases = [
-            {
-                'name': 'zero_values',
-                'data': {
-                    'u8_field': 0, 'u16_field': 0, 'u32_field': 0, 'u64_field': 0,
-                    'i8_field': 0, 'i16_field': 0, 'i32_field': 0, 'i64_field': 0,
-                    'f32_field': 0.0, 'f64_field': 0.0
-                }
-            },
-            {
-                'name': 'max_unsigned_values',
-                'data': {
-                    'u8_field': 255, 'u16_field': 65535, 'u32_field': 4294967295, 'u64_field': 18446744073709551615,
-                    'i8_field': 127, 'i16_field': 32767, 'i32_field': 2147483647, 'i64_field': 9223372036854775807,
-                    'f32_field': 3.14159, 'f64_field': 2.718281828459045
-                }
-            },
-            {
-                'name': 'min_signed_values',
-                'data': {
-                    'u8_field': 1, 'u16_field': 1, 'u32_field': 1, 'u64_field': 1,
-                    'i8_field': -128, 'i16_field': -32768, 'i32_field': -2147483648, 'i64_field': -9223372036854775808,
-                    'f32_field': -3.14159, 'f64_field': -2.718281828459045
-                }
-            },
-            {
-                'name': 'random_values',
-                'data': {
-                    'u8_field': 42, 'u16_field': 1234, 'u32_field': 987654321, 'u64_field': 1234567890123456789,
-                    'i8_field': -42, 'i16_field': -1234, 'i32_field': -987654321, 'i64_field': -1234567890123456789,
-                    'f32_field': 123.456, 'f64_field': 123456.789012345
-                }
-            }
-        ]
+        # Use test data from common schemas
+        test_cases = IntegrationTestData.PRIMITIVE_TEST_CASES
         
         # Test Python to binary and back
         self._test_python_round_trip(lang_dirs['python'], 'AllPrimitives', test_cases)
     
     def test_variable_length_types(self):
         """Test string, bytes, and array types."""
-        schema_content = """
-        namespace test.variable;
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.VARIABLE_TYPES)
         
-        struct VariableTypes {
-            name: string;
-            data: bytes;
-            numbers: [u32];
-            texts: [string];
-        }
-        """
+        # Generate code for all languages
+        temp_dir = self.create_temp_dir()
+        python_dir = temp_dir / "python_generated"
+        python_dir.mkdir(exist_ok=True)
+        python_generator = PythonCodeGenerator(schema)
+        python_files = python_generator.generate()
+        for filename, content in python_files.items():
+            (python_dir / filename).write_text(content)
         
-        schema_file = self.create_schema_file(schema_content)
-        lang_dirs = self.generate_all_languages(schema_file)
+        lang_dirs = {'python': python_dir}
         
-        test_cases = [
-            {
-                'name': 'empty_values',
-                'data': {
-                    'name': '',
-                    'data': b'',
-                    'numbers': [],
-                    'texts': []
-                }
-            },
-            {
-                'name': 'simple_values',
-                'data': {
-                    'name': 'Hello, World!',
-                    'data': b'binary data here',
-                    'numbers': [1, 2, 3, 4, 5],
-                    'texts': ['first', 'second', 'third']
-                }
-            },
-            {
-                'name': 'unicode_and_large_arrays',
-                'data': {
-                    'name': 'Unicode: 🚀 ñ ü 中文',
-                    'data': bytes(range(256)),  # All possible byte values
-                    'numbers': list(range(100)),  # Large array
-                    'texts': [f'item_{i}' for i in range(50)]  # Many strings
-                }
-            },
-            {
-                'name': 'special_characters',
-                'data': {
-                    'name': 'Special: \n\t\r"\'\\',
-                    'data': b'\x00\x01\x02\xff\xfe\xfd',
-                    'numbers': [0, 1, 4294967295],  # Min and max u32
-                    'texts': ['', 'single', 'multiple words here']
-                }
-            }
-        ]
+        # Use test data from common schemas
+        test_cases = IntegrationTestData.VARIABLE_TEST_CASES
         
         # Test Python round trip
         self._test_python_round_trip(lang_dirs['python'], 'VariableTypes', test_cases)
     
     def test_nested_structures(self):
         """Test nested struct composition."""
-        schema_content = """
-        namespace test.nested;
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.NESTED_STRUCTURES)
         
-        struct Point {
-            x: f32;
-            y: f32;
-        }
+        # Generate code for all languages
+        temp_dir = self.create_temp_dir()
+        python_dir = temp_dir / "python_generated"
+        python_dir.mkdir(exist_ok=True)
+        python_generator = PythonCodeGenerator(schema)
+        python_files = python_generator.generate()
+        for filename, content in python_files.items():
+            (python_dir / filename).write_text(content)
         
-        struct Rectangle {
-            top_left: Point;
-            bottom_right: Point;
-            color: u32;
-        }
-        
-        struct Scene {
-            background: Rectangle;
-            foreground: Rectangle;
-            name: string;
-        }
-        """
-        
-        schema_file = self.create_schema_file(schema_content)
-        lang_dirs = self.generate_all_languages(schema_file)
+        lang_dirs = {'python': python_dir}
         
         # Test individual structs first
         point_cases = [
@@ -255,29 +171,19 @@ class TestDataTypes:
     
     def test_arrays_of_structs(self):
         """Test arrays containing struct types."""
-        schema_content = """
-        namespace test.arrays;
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.ARRAYS_OF_STRUCTS)
         
-        struct Vertex {
-            x: f32;
-            y: f32;
-            z: f32;
-        }
+        # Generate code for all languages
+        temp_dir = self.create_temp_dir()
+        python_dir = temp_dir / "python_generated"
+        python_dir.mkdir(exist_ok=True)
+        python_generator = PythonCodeGenerator(schema)
+        python_files = python_generator.generate()
+        for filename, content in python_files.items():
+            (python_dir / filename).write_text(content)
         
-        struct Polygon {
-            vertices: [Vertex];
-            color: u32;
-            name: string;
-        }
-        
-        struct Mesh {
-            polygons: [Polygon];
-            material: string;
-        }
-        """
-        
-        schema_file = self.create_schema_file(schema_content)
-        lang_dirs = self.generate_all_languages(schema_file)
+        lang_dirs = {'python': python_dir}
         
         test_cases = [
             {
@@ -310,23 +216,19 @@ class TestDataTypes:
     
     def test_multidimensional_arrays(self):
         """Test nested arrays (2D, 3D arrays)."""
-        schema_content = """
-        namespace test.multidim;
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.MULTIDIMENSIONAL_ARRAYS)
         
-        struct Matrix2D {
-            rows: [[f32]];
-            width: u32;
-            height: u32;
-        }
+        # Generate code for all languages
+        temp_dir = self.create_temp_dir()
+        python_dir = temp_dir / "python_generated"
+        python_dir.mkdir(exist_ok=True)
+        python_generator = PythonCodeGenerator(schema)
+        python_files = python_generator.generate()
+        for filename, content in python_files.items():
+            (python_dir / filename).write_text(content)
         
-        struct Tensor3D {
-            data: [[[u8]]];
-            dimensions: [u32];
-        }
-        """
-        
-        schema_file = self.create_schema_file(schema_content)
-        lang_dirs = self.generate_all_languages(schema_file)
+        lang_dirs = {'python': python_dir}
         
         matrix_cases = [
             {

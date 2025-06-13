@@ -1,0 +1,53 @@
+namespace test.arrays;
+
+enum Direction : u8 {
+    North,
+    East,
+    South,
+    West,
+}
+
+struct Vector3 {
+    coords: [f32:3];
+}
+
+struct Transform {
+    position: [f64:3];
+    rotation: [f32:4];
+    scale: [f32:3];
+}
+
+struct GameState {
+    player_positions: [Vector3:4];
+    directions: [Direction:4];
+    scores: [u32:4];
+}
+
+struct FixedArrayStruct {
+    coords: [f32:3];
+    flags: [u8:4];
+    names: [string:2];
+    directions: [Direction:4];
+    vectors: [Vector3:2];
+}
+
+struct FixedPrimitiveArrays {
+    bytes3: [u8:3];
+    coords: [f32:4];
+    matrix: [f64:9];
+}
+
+struct StringArrays {
+    names: [string:5];
+    labels: [string:10];
+}
+
+struct Point {
+    x: f32;
+    y: f32;
+}
+
+struct FixedStructArrays {
+    triangle: [Point:3];
+    polygon: [Point:8];
+} 

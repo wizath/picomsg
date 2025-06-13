@@ -1,0 +1,7 @@
+namespace test;
+
+struct Config {
+    name: string;
+    value: u32;
+    enabled: bool;
+} 

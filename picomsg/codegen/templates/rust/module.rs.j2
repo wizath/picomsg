@@ -1,0 +1,77 @@
+//! Generated PicoMsg Rust bindings
+//! This file is auto-generated. Do not edit manually.
+
+use serde::{Deserialize, Serialize};
+use std::io::{Read, Write};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use base64::{Engine as _, engine::general_purpose};
+
+// PicoMsg format constants
+#[allow(dead_code)]
+pub const {{ (namespace_prefix | upper + '_') if namespace_prefix else '' }}MAGIC_BYTE_1: u8 = 0xAB;
+#[allow(dead_code)]
+pub const {{ (namespace_prefix | upper + '_') if namespace_prefix else '' }}MAGIC_BYTE_2: u8 = 0xCD;
+#[allow(dead_code)]
+pub const {{ (namespace_prefix | upper + '_') if namespace_prefix else '' }}VERSION: u8 = {{ schema.version or 1 }};
+#[allow(dead_code)]
+pub const {{ (namespace_prefix | upper + '_') if namespace_prefix else '' }}HEADER_SIZE: usize = 8;
+
+// Message type IDs
+{% for message in schema.messages %}
+#[allow(dead_code)]
+pub const {{ (namespace_prefix | upper + '_') if namespace_prefix else '' }}{{ message.name | upper }}_TYPE_ID: u16 = {{ loop.index }};
+{% endfor %}
+
+// Error types
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+pub enum {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error {
+    InvalidHeader,
+    BufferTooSmall,
+    InvalidData,
+    IoError(String),
+}
+
+impl std::fmt::Display for {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::InvalidHeader => write!(f, "Invalid header"),
+            {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::BufferTooSmall => write!(f, "Buffer too small"),
+            {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::InvalidData => write!(f, "Invalid data"),
+            {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::IoError(msg) => write!(f, "IO error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error {}
+
+impl From<std::io::Error> for {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error {
+    fn from(err: std::io::Error) -> Self {
+        {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::IoError(err.to_string())
+    }
+}
+
+pub type {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<T> = Result<T, {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error>;
+
+// Trait for PicoMsg serialization
+pub trait {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Serialize {
+    fn from_bytes(data: &[u8]) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> where Self: Sized;
+    fn to_bytes(&self) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Vec<u8>>;
+    fn from_reader<R: Read>(reader: &mut R) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> where Self: Sized;
+    fn to_writer<W: Write>(&self, writer: &mut W) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<()>;
+    fn to_base64(&self) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<String>;
+    fn from_base64(base64_str: &str) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> where Self: Sized;
+}
+
+{% for enum in schema.enums %}
+{% include 'rust/enum.rs.j2' %}
+
+{% endfor %}
+{% for struct in schema.structs %}
+{% include 'rust/struct.rs.j2' %}
+
+{% endfor %}
+{% for message in schema.messages %}
+{% include 'rust/message.rs.j2' %}
+
+{% endfor %} 

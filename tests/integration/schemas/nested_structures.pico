@@ -1,0 +1,18 @@
+namespace test.nested;
+
+struct Point {
+    x: f32;
+    y: f32;
+}
+
+struct Rectangle {
+    top_left: Point;
+    bottom_right: Point;
+    color: u32;
+}
+
+struct Scene {
+    background: Rectangle;
+    foreground: Rectangle;
+    name: string;
+} 

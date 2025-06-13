@@ -1,0 +1,8 @@
+namespace test.variable;
+
+struct VariableTypes {
+    name: string;
+    data: bytes;
+    numbers: [u32];
+    texts: [string];
+} 

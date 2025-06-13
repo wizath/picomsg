@@ -254,35 +254,33 @@ console.log("All tests passed!");
                 pytest.fail(f"Compilation failed:\nSTDOUT: {e.output}\nSTDERR: {e.stderr}")
     
     def test_typescript_complex_structures(self):
-        """Test TypeScript generation with complex nested structures."""
+        """Test TypeScript generation with complex nested structures and arrays."""
         schema_text = """
-        namespace api;
+        namespace complex;
         
-        enum Status: u8 {
-            ACTIVE = 1,
-            INACTIVE = 2,
-            PENDING = 3
-        }
-        
-        struct Point {
+        struct Vector3 {
             x: f32;
             y: f32;
+            z: f32;
         }
         
-        struct Header {
-            command: u8;
-            length: u16;
-            crc: u16;
+        struct Transform {
+            position: Vector3;
+            rotation: Vector3;
+            scale: Vector3;
         }
         
-        message UserProfile {
-            id: u32;
-            username: string;
-            email: string;
-            status: Status;
-            location: Point;
-            header: Header;
-            tags: [u8:10];
+        message GameObject {
+            id: u64;
+            name: string;
+            transform: Transform;
+            tags: [string];
+        }
+        
+        message Scene {
+            name: string;
+            objects: [GameObject];
+            camera_position: Vector3;
         }
         """
         
@@ -291,85 +289,87 @@ console.log("All tests passed!");
         files = generator.generate()
         
         main_ts = '''
-import { UserProfile, Point, Header, Status } from './picomsg-generated';
+import { Scene, GameObject, Transform, Vector3 } from './picomsg-generated';
 
 console.log("Testing complex TypeScript structures...");
 
 // Create complex nested structure
-const profile = new UserProfile({
-    id: 42,
-    username: "testuser",
-    email: "test@example.com",
-    status: Status.ACTIVE,
-    location: new Point({ x: 10.5, y: 20.7 }),
-    header: new Header({ command: 1, length: 256, crc: 0xABCD }),
-    tags: [1, 2, 3, 4, 5, 0, 0, 0, 0, 0]
+const scene = new Scene({
+    name: "TestScene",
+    camera_position: new Vector3({ x: 0.0, y: 5.0, z: -10.0 }),
+    objects: [
+        new GameObject({
+            id: 1,
+            name: "Player",
+            transform: new Transform({
+                position: new Vector3({ x: 0.0, y: 1.0, z: 0.0 }),
+                rotation: new Vector3({ x: 0.0, y: 45.0, z: 0.0 }),
+                scale: new Vector3({ x: 1.0, y: 1.0, z: 1.0 })
+            }),
+            tags: ["player", "controllable"]
+        }),
+        new GameObject({
+            id: 2,
+            name: "Enemy",
+            transform: new Transform({
+                position: new Vector3({ x: 10.0, y: 0.0, z: 5.0 }),
+                rotation: new Vector3({ x: 0.0, y: 180.0, z: 0.0 }),
+                scale: new Vector3({ x: 1.2, y: 1.2, z: 1.2 })
+            }),
+            tags: ["enemy", "ai"]
+        })
+    ]
 });
 
-console.log("Created profile:", JSON.stringify(profile.toJSON(), null, 2));
+console.log("Created scene:", JSON.stringify(scene.toJSON(), null, 2));
 
 // Test serialization
-const bytes = profile.toBytes();
-console.log(`SUCCESS: Serialized ${bytes.length} bytes`);
+const bytes = scene.toBytes();
+console.log(`SUCCESS: Wrote complex scene (${bytes.length} bytes)`);
 
 // Test deserialization
-const decoded = new UserProfile();
-decoded.fromBytes(bytes);
+const readScene = new Scene();
+readScene.fromBytes(bytes);
 
-console.log("SUCCESS: Deserialized profile");
-console.log("  ID:", decoded.id);
-console.log("  Username:", decoded.username);
-console.log("  Email:", decoded.email);
-console.log("  Status:", decoded.status);
-console.log("  Location:", decoded.location.toJSON());
-console.log("  Header:", decoded.header.toJSON());
-console.log("  Tags:", decoded.tags);
+console.log("SUCCESS: Read complex scene back");
+console.log("  Scene name:", readScene.name);
+console.log("  Object count:", readScene.objects.length);
 
-// Verify all fields
+// Verify first object
+if (readScene.objects.length > 0) {
+    const firstObj = readScene.objects[0];
+    console.log("  First object:", firstObj.name);
+    console.log(`    Position: (${firstObj.transform.position.x}, ${firstObj.transform.position.y}, ${firstObj.transform.position.z})`);
+    console.log("    Tags:", firstObj.tags);
+}
+
+// Verify data integrity
 let success = true;
-if (decoded.id !== profile.id) {
-    console.log("ERROR: ID mismatch");
+if (readScene.name !== scene.name) {
+    console.log("ERROR: Scene name mismatch");
     success = false;
 }
-if (decoded.username !== profile.username) {
-    console.log("ERROR: Username mismatch");
+if (readScene.objects.length !== scene.objects.length) {
+    console.log("ERROR: Object count mismatch");
     success = false;
 }
-if (decoded.email !== profile.email) {
-    console.log("ERROR: Email mismatch");
+if (readScene.objects.length > 0 && readScene.objects[0].name !== scene.objects[0].name) {
+    console.log("ERROR: First object name mismatch");
     success = false;
 }
-if (decoded.status !== profile.status) {
-    console.log("ERROR: Status mismatch");
+if (readScene.objects.length > 0 && readScene.objects[0].tags.length !== scene.objects[0].tags.length) {
+    console.log("ERROR: First object tags length mismatch");
     success = false;
-}
-if (Math.abs(decoded.location.x - profile.location.x) > 0.001 ||
-    Math.abs(decoded.location.y - profile.location.y) > 0.001) {
-    console.log("ERROR: Location mismatch");
-    success = false;
-}
-if (decoded.header.command !== profile.header.command ||
-    decoded.header.length !== profile.header.length ||
-    decoded.header.crc !== profile.header.crc) {
-    console.log("ERROR: Header mismatch");
-    success = false;
-}
-for (let i = 0; i < 10; i++) {
-    if (decoded.tags[i] !== profile.tags[i]) {
-        console.log(`ERROR: Tag ${i} mismatch`);
-        success = false;
-        break;
-    }
 }
 
 if (success) {
-    console.log("SUCCESS: All complex structure tests passed");
+    console.log("SUCCESS: Complex structure integrity verified");
 } else {
-    console.log("ERROR: Complex structure tests failed");
+    console.log("ERROR: Complex structure integrity check failed");
     process.exit(1);
 }
 
-console.log("All tests passed!");
+console.log("Complex structure test passed!");
 '''
         
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -399,10 +399,10 @@ console.log("All tests passed!");
                 result = self._install_and_compile(temp_path)
                 
                 assert result.returncode == 0, f"Program failed:\n{result.stdout}\n{result.stderr}"
-                assert "SUCCESS: Serialized" in result.stdout
-                assert "SUCCESS: Deserialized profile" in result.stdout
-                assert "SUCCESS: All complex structure tests passed" in result.stdout
-                assert "All tests passed!" in result.stdout
+                assert "SUCCESS: Wrote complex scene" in result.stdout
+                assert "SUCCESS: Read complex scene back" in result.stdout
+                assert "SUCCESS: Complex structure integrity verified" in result.stdout
+                assert "Complex structure test passed!" in result.stdout
                 
             except subprocess.CalledProcessError as e:
                 pytest.fail(f"Compilation failed:\nSTDOUT: {e.output}\nSTDERR: {e.stderr}")

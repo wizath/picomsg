@@ -1,0 +1,25 @@
+/// Enum: {{ enum.name }}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[repr({{ enum.backing_type | rust_type }})]
+pub enum {{ namespace_prefix }}{{ enum.name }} {
+{% for value in enum.values %}
+    {{ value.name }} = {{ value.value }},
+{% endfor %}
+}
+
+impl {{ namespace_prefix }}{{ enum.name }} {
+    /// Convert from {{ enum.backing_type | rust_type }} value
+    pub fn from_{{ enum.backing_type | rust_type }}(value: {{ enum.backing_type | rust_type }}) -> Option<Self> {
+        match value {
+{% for value in enum.values %}
+            {{ value.value }} => Some(Self::{{ value.name }}),
+{% endfor %}
+            _ => None,
+        }
+    }
+
+    /// Convert to {{ enum.backing_type | rust_type }} value
+    pub fn to_{{ enum.backing_type | rust_type }}(self) -> {{ enum.backing_type | rust_type }} {
+        self as {{ enum.backing_type | rust_type }}
+    }
+} 

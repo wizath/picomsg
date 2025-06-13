@@ -12,6 +12,7 @@ from pathlib import Path
 from picomsg.schema.parser import SchemaParser
 from picomsg.codegen.python import PythonCodeGenerator
 from picomsg.codegen.python_json import PythonJsonCodeGenerator
+from .common_schemas import SchemaFiles, load_schema, TestData
 
 
 def python_available():
@@ -44,17 +45,7 @@ class TestPythonEndToEnd(unittest.TestCase):
     
     def test_basic_python_binary_generation(self):
         """Test basic Python binary format generation and usage."""
-        schema_text = """
-        namespace game;
-        
-        message Player {
-            id: u32;
-            name: string;
-            health: u32;
-        }
-        """
-        
-        schema = self.parser.parse_string(schema_text)
+        schema = load_schema(SchemaFiles.BASIC_PLAYER)
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
         
@@ -122,25 +113,7 @@ if __name__ == "__main__":
     
     def test_python_json_validation_end_to_end(self):
         """Test Python JSON validation generation and usage."""
-        schema_text = """
-        namespace api;
-        
-        struct Point {
-            x: f32;
-            y: f32;
-        }
-        
-        message UserProfile {
-            id: u32;
-            username: string = "anonymous";
-            email: string;
-            age: u8 = 18;
-            location: Point;
-            verified: bool = false;
-        }
-        """
-        
-        schema = self.parser.parse_string(schema_text)
+        schema = load_schema(SchemaFiles.JSON_VALIDATION)
         generator = PythonJsonCodeGenerator(schema)
         files = generator.generate()
         
@@ -245,36 +218,7 @@ if __name__ == "__main__":
     
     def test_python_complex_structures(self):
         """Test Python generation with complex nested structures and arrays."""
-        schema_text = """
-        namespace complex;
-        
-        struct Vector3 {
-            x: f32;
-            y: f32;
-            z: f32;
-        }
-        
-        struct Transform {
-            position: Vector3;
-            rotation: Vector3;
-            scale: Vector3;
-        }
-        
-        message GameObject {
-            id: u64;
-            name: string;
-            transform: Transform;
-            tags: [string];
-        }
-        
-        message Scene {
-            name: string;
-            objects: [GameObject];
-            camera_position: Vector3;
-        }
-        """
-        
-        schema = self.parser.parse_string(schema_text)
+        schema = load_schema(SchemaFiles.COMPLEX_STRUCTURES)
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
         
@@ -402,20 +346,7 @@ if __name__ == "__main__":
     
     def test_python_default_values_integration(self):
         """Test Python generation with default values in real usage."""
-        schema_text = """
-        namespace config;
-        
-        message ServerConfig {
-            host: string = "localhost";
-            port: u16 = 8080;
-            max_connections: u32 = 1000;
-            enable_ssl: bool = false;
-            timeout_seconds: u32 = 30;
-            debug_mode: bool = false;
-        }
-        """
-        
-        schema = self.parser.parse_string(schema_text)
+        schema = load_schema(SchemaFiles.DEFAULT_VALUES)
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
         
@@ -494,23 +425,7 @@ if __name__ == "__main__":
     
     def test_python_performance_benchmark(self):
         """Test Python generation with performance benchmarking."""
-        schema_text = """
-        namespace perf;
-        
-        message DataPoint {
-            timestamp: u64;
-            value: f64;
-            label: string;
-        }
-        
-        message Dataset {
-            name: string;
-            points: [DataPoint];
-            metadata: string;
-        }
-        """
-        
-        schema = self.parser.parse_string(schema_text)
+        schema = load_schema(SchemaFiles.PERFORMANCE)
         generator = PythonCodeGenerator(schema)
         files = generator.generate()
         

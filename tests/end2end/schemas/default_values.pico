@@ -1,0 +1,10 @@
+namespace config;
+
+message ServerConfig {
+    host: string = "localhost";
+    port: u16 = 8080;
+    max_connections: u32 = 1000;
+    enable_ssl: bool = false;
+    timeout_seconds: u32 = 30;
+    debug_mode: bool = false;
+} 

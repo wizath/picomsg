@@ -1,0 +1,26 @@
+namespace complex;
+
+struct Vector3 {
+    x: f32;
+    y: f32;
+    z: f32;
+}
+
+struct Transform {
+    position: Vector3;
+    rotation: Vector3;
+    scale: Vector3;
+}
+
+message GameObject {
+    id: u64;
+    name: string;
+    transform: Transform;
+    tags: [string];
+}
+
+message Scene {
+    name: string;
+    objects: [GameObject];
+    camera_position: Vector3;
+} 

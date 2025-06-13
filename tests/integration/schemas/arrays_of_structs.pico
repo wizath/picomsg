@@ -1,0 +1,18 @@
+namespace test.arrays;
+
+struct Vertex {
+    x: f32;
+    y: f32;
+    z: f32;
+}
+
+struct Polygon {
+    vertices: [Vertex];
+    color: u32;
+    name: string;
+}
+
+struct Mesh {
+    polygons: [Polygon];
+    material: string;
+} 

@@ -1,0 +1,93 @@
+{% if field.type.__class__.__name__ == 'PrimitiveType' %}
+  {% if field.type.name in ['u8', 'i8'] %}
+    buffer.push(this.{{ field.name }} & 0xFF);
+  {% elif field.type.name in ['u16', 'i16'] %}
+    buffer.push(this.{{ field.name }} & 0xFF);
+    buffer.push((this.{{ field.name }} >> 8) & 0xFF);
+  {% elif field.type.name in ['u32', 'i32'] %}
+    buffer.push(this.{{ field.name }} & 0xFF);
+    buffer.push((this.{{ field.name }} >> 8) & 0xFF);
+    buffer.push((this.{{ field.name }} >> 16) & 0xFF);
+    buffer.push((this.{{ field.name }} >> 24) & 0xFF);
+  {% elif field.type.name == 'f32' %}
+    const {{ field.name }}F32Array = new Float32Array([this.{{ field.name }}]);
+    const {{ field.name }}F32Bytes = new Uint8Array({{ field.name }}F32Array.buffer);
+    buffer.push(...{{ field.name }}F32Bytes);
+  {% elif field.type.name == 'f64' %}
+    const {{ field.name }}F64Array = new Float64Array([this.{{ field.name }}]);
+    const {{ field.name }}F64Bytes = new Uint8Array({{ field.name }}F64Array.buffer);
+    buffer.push(...{{ field.name }}F64Bytes);
+  {% elif field.type.name == 'bool' %}
+    buffer.push(this.{{ field.name }} ? 1 : 0);
+  {% endif %}
+{% elif field.type.__class__.__name__ == 'StringType' %}
+    const {{ field.name }}Bytes = new TextEncoder().encode(this.{{ field.name }});
+    buffer.push({{ field.name }}Bytes.length & 0xFF);
+    buffer.push(({{ field.name }}Bytes.length >> 8) & 0xFF);
+    buffer.push(...{{ field.name }}Bytes);
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+    buffer.push(this.{{ field.name }}.length & 0xFF);
+    buffer.push((this.{{ field.name }}.length >> 8) & 0xFF);
+    buffer.push(...this.{{ field.name }});
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+    buffer.push(this.{{ field.name }}.length & 0xFF);
+    buffer.push((this.{{ field.name }}.length >> 8) & 0xFF);
+    for (const {{ field.name }}Item of this.{{ field.name }}) {
+  {% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+    {% if field.type.element_type.name in ['u8', 'i8'] %}
+      buffer.push({{ field.name }}Item & 0xFF);
+    {% elif field.type.element_type.name in ['u16', 'i16'] %}
+      buffer.push({{ field.name }}Item & 0xFF);
+      buffer.push(({{ field.name }}Item >> 8) & 0xFF);
+    {% elif field.type.element_type.name in ['u32', 'i32'] %}
+      buffer.push({{ field.name }}Item & 0xFF);
+      buffer.push(({{ field.name }}Item >> 8) & 0xFF);
+      buffer.push(({{ field.name }}Item >> 16) & 0xFF);
+      buffer.push(({{ field.name }}Item >> 24) & 0xFF);
+    {% elif field.type.element_type.name == 'f32' %}
+      const {{ field.name }}ItemF32Array = new Float32Array([{{ field.name }}Item]);
+      const {{ field.name }}ItemF32Bytes = new Uint8Array({{ field.name }}ItemF32Array.buffer);
+      buffer.push(...{{ field.name }}ItemF32Bytes);
+    {% elif field.type.element_type.name == 'f64' %}
+      const {{ field.name }}ItemF64Array = new Float64Array([{{ field.name }}Item]);
+      const {{ field.name }}ItemF64Bytes = new Uint8Array({{ field.name }}ItemF64Array.buffer);
+      buffer.push(...{{ field.name }}ItemF64Bytes);
+    {% elif field.type.element_type.name == 'bool' %}
+      buffer.push({{ field.name }}Item ? 1 : 0);
+    {% endif %}
+  {% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+      const {{ field.name }}ItemBytes = new TextEncoder().encode({{ field.name }}Item);
+      buffer.push({{ field.name }}ItemBytes.length & 0xFF);
+      buffer.push(({{ field.name }}ItemBytes.length >> 8) & 0xFF);
+      buffer.push(...{{ field.name }}ItemBytes);
+  {% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+      buffer.push({{ field.name }}Item.length & 0xFF);
+      buffer.push(({{ field.name }}Item.length >> 8) & 0xFF);
+      buffer.push(...{{ field.name }}Item);
+  {% elif field.type.element_type.__class__.__name__ in ['StructType', 'EnumType'] %}
+    {% if field.type.element_type.__class__.__name__ == 'EnumType' %}
+      buffer.push({{ field.name }}Item);
+    {% else %}
+      const {{ field.name }}ItemBytes = {{ field.name }}Item.toBytes();
+      buffer.push(...{{ field.name }}ItemBytes);
+    {% endif %}
+  {% endif %}
+    }
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+  {% if field.type.element_type.__class__.__name__ == 'PrimitiveType' and field.type.element_type.name == 'u8' %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      buffer.push((this.{{ field.name }}[i] || 0) & 0xFF);
+    }
+  {% else %}
+    // TODO: Complex fixed array serialization
+  {% endif %}
+{% elif field.type.__class__.__name__ in ['StructType', 'EnumType'] %}
+  {% if field.type.__class__.__name__ == 'EnumType' %}
+    buffer.push(this.{{ field.name }});
+  {% else %}
+    const {{ field.name }}Bytes = this.{{ field.name }}.toBytes();
+    buffer.push(...{{ field.name }}Bytes);
+  {% endif %}
+{% else %}
+    // TODO: Implement serialization for {{ field.type.__class__.__name__ }}
+{% endif %} 

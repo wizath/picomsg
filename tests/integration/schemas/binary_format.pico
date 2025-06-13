@@ -1,0 +1,17 @@
+namespace test.binary;
+
+enum Color : u8 {
+    Red = 1,
+    Green = 2,
+    Blue = 3,
+}
+
+struct Pixel {
+    x: u16;
+    y: u16;
+    color: Color;
+}
+
+struct IntArray {
+    values: [u32:3];
+} 

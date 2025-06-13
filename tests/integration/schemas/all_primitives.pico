@@ -1,0 +1,14 @@
+namespace test.primitives;
+
+struct AllPrimitives {
+    u8_field: u8;
+    u16_field: u16;
+    u32_field: u32;
+    u64_field: u64;
+    i8_field: i8;
+    i16_field: i16;
+    i32_field: i32;
+    i64_field: i64;
+    f32_field: f32;
+    f64_field: f64;
+} 

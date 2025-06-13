@@ -12,6 +12,7 @@ from picomsg.schema.ast import FixedArrayType, PrimitiveType, StringType, Struct
 from picomsg.codegen.python import PythonCodeGenerator
 from picomsg.codegen.c import CCodeGenerator
 from picomsg.codegen.rust import RustCodeGenerator
+from .common_schemas import IntegrationSchemas, load_schema
 
 
 class TestFixedArrayParsing:
@@ -19,23 +20,21 @@ class TestFixedArrayParsing:
     
     def test_parse_fixed_primitive_arrays(self):
         """Test parsing fixed arrays of primitive types."""
-        schema_text = """
-        struct FixedArrays {
-            bytes3: [u8:3];
-            coords: [f32:4];
-            matrix: [f64:9];
-        }
-        """
+        # Load schema from file
+        schema = load_schema(IntegrationSchemas.FIXED_ARRAYS)
         
-        parser = SchemaParser()
-        schema = parser.parse_string(schema_text)
+        # Find the FixedPrimitiveArrays struct
+        fixed_primitive_struct = None
+        for struct in schema.structs:
+            if struct.name == "FixedPrimitiveArrays":
+                fixed_primitive_struct = struct
+                break
         
-        assert len(schema.structs) == 1
-        struct = schema.structs[0]
-        assert len(struct.fields) == 3
+        assert fixed_primitive_struct is not None
+        assert len(fixed_primitive_struct.fields) == 3
         
         # bytes3: [u8:3]
-        field = struct.fields[0]
+        field = fixed_primitive_struct.fields[0]
         assert field.name == "bytes3"
         assert isinstance(field.type, FixedArrayType)
         assert isinstance(field.type.element_type, PrimitiveType)
@@ -43,7 +42,7 @@ class TestFixedArrayParsing:
         assert field.type.size == 3
         
         # coords: [f32:4]
-        field = struct.fields[1]
+        field = fixed_primitive_struct.fields[1]
         assert field.name == "coords"
         assert isinstance(field.type, FixedArrayType)
         assert isinstance(field.type.element_type, PrimitiveType)
@@ -51,7 +50,7 @@ class TestFixedArrayParsing:
         assert field.type.size == 4
         
         # matrix: [f64:9]
-        field = struct.fields[2]
+        field = fixed_primitive_struct.fields[2]
         assert field.name == "matrix"
         assert isinstance(field.type, FixedArrayType)
         assert isinstance(field.type.element_type, PrimitiveType)

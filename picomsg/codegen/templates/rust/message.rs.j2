@@ -1,0 +1,46 @@
+/// Message: {{ message.name }}
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct {{ namespace_prefix }}{{ message.name }} {
+{% for field in message.fields %}
+    pub {{ field.name }}: {{ field.type | rust_type_with_namespace(namespace_prefix) }},
+{% endfor %}
+}
+
+impl {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Serialize for {{ namespace_prefix }}{{ message.name }} {
+    fn from_bytes(data: &[u8]) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> {
+        let mut cursor = std::io::Cursor::new(data);
+        Self::from_reader(&mut cursor)
+    }
+
+    fn to_bytes(&self) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Vec<u8>> {
+        let mut buffer = Vec::new();
+        self.to_writer(&mut buffer)?;
+        Ok(buffer)
+    }
+
+    fn from_reader<R: Read>(reader: &mut R) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> {
+        Ok(Self {
+{% for field in message.fields %}
+{% include 'rust/field_read.rs.j2' %}
+{% endfor %}
+        })
+    }
+
+    fn to_writer<W: Write>(&self, writer: &mut W) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<()> {
+{% for field in message.fields %}
+{% include 'rust/field_write.rs.j2' %}
+{% endfor %}
+        Ok(())
+    }
+
+    fn to_base64(&self) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<String> {
+        let bytes = self.to_bytes()?;
+        Ok(general_purpose::STANDARD.encode(&bytes))
+    }
+
+    fn from_base64(base64_str: &str) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> {
+        let bytes = general_purpose::STANDARD.decode(base64_str)
+            .map_err(|_| {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::InvalidData)?;
+        Self::from_bytes(&bytes)
+    }
+} 

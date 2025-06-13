@@ -1,0 +1,295 @@
+class {{ namespace_prefix if namespace_prefix else '' }}{{ struct.name }}({{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Base):
+    """Struct: {{ struct.name }}"""
+    
+    def __init__(self, **kwargs):
+        super().__init__()
+        
+        # Initialize fields with default values
+{% for field in struct.fields %}
+        self._{{ field.name }} = kwargs.get("{{ field.name }}", {{ field.type | python_default_value_with_schema(schema) }})
+{% endfor %}
+{% for field in struct.fields %}
+{% if field.type.__class__.__name__ == 'FixedArrayType' %}
+        # Validate fixed array size for {{ field.name }}
+        if len(self._{{ field.name }}) != {{ field.type.size }}:
+            raise ValueError(f"Field '{{ field.name }}' must have exactly {{ field.type.size }} elements, got {len(self._{{ field.name }})}")
+{% endif %}
+{% endfor %}
+
+{% for field in struct.fields %}
+    @property
+    def {{ field.name }}(self):
+        """Get {{ field.name }}."""
+        return self._{{ field.name }}
+    
+    @{{ field.name }}.setter
+    def {{ field.name }}(self, value):
+        """Set {{ field.name }}."""
+{% if field.type.__class__.__name__ == 'FixedArrayType' %}
+        if len(value) != {{ field.type.size }}:
+            raise ValueError(f"Field '{{ field.name }}' must have exactly {{ field.type.size }} elements, got {len(value)}")
+{% endif %}
+        self._{{ field.name }} = value
+
+{% endfor %}
+    def _write_to_buffer(self, buffer: BytesIO) -> None:
+        """Write struct to buffer using struct module."""
+{% for field in struct.fields %}
+{% if field.type.__class__.__name__ == 'PrimitiveType' %}
+        buffer.write(struct.pack('{{ field.type | python_struct_format }}', self._{{ field.name }}))
+{% elif field.type.__class__.__name__ == 'StringType' %}
+        encoded_{{ field.name }} = self._{{ field.name }}.encode('utf-8')
+        buffer.write(struct.pack('<H', len(encoded_{{ field.name }})))
+        buffer.write(encoded_{{ field.name }})
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+        buffer.write(struct.pack('<H', len(self._{{ field.name }})))
+        buffer.write(self._{{ field.name }})
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+        buffer.write(struct.pack('<H', len(self._{{ field.name }})))
+        for item in self._{{ field.name }}:
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+            buffer.write(struct.pack('{{ field.type.element_type | python_struct_format }}', item))
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+            encoded_item = item.encode('utf-8')
+            buffer.write(struct.pack('<H', len(encoded_item)))
+            buffer.write(encoded_item)
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+            buffer.write(struct.pack('<H', len(item)))
+            buffer.write(item)
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+            item._write_to_buffer(buffer)
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+            buffer.write(struct.pack('{{ field.type.element_type | python_enum_backing_type }}', item.to_int()))
+{% elif field.type.element_type.__class__.__name__ == 'ArrayType' %}
+            buffer.write(struct.pack('<H', len(item)))
+            for subitem in item:
+{% if field.type.element_type.element_type.__class__.__name__ == 'PrimitiveType' %}
+                buffer.write(struct.pack('{{ field.type.element_type.element_type | python_struct_format }}', subitem))
+{% elif field.type.element_type.element_type.__class__.__name__ == 'StringType' %}
+                encoded_subitem = subitem.encode('utf-8')
+                buffer.write(struct.pack('<H', len(encoded_subitem)))
+                buffer.write(encoded_subitem)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'BytesType' %}
+                buffer.write(struct.pack('<H', len(subitem)))
+                buffer.write(subitem)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'StructType' %}
+                subitem._write_to_buffer(buffer)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'EnumType' %}
+                buffer.write(struct.pack('{{ field.type.element_type.element_type | python_enum_backing_type }}', subitem.to_int()))
+{% elif field.type.element_type.element_type.__class__.__name__ == 'ArrayType' %}
+                buffer.write(struct.pack('<H', len(subitem)))
+                for subsubitem in subitem:
+{% if field.type.element_type.element_type.element_type.__class__.__name__ == 'PrimitiveType' %}
+                    buffer.write(struct.pack('{{ field.type.element_type.element_type.element_type | python_struct_format }}', subsubitem))
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'StringType' %}
+                    encoded_subsubitem = subsubitem.encode('utf-8')
+                    buffer.write(struct.pack('<H', len(encoded_subsubitem)))
+                    buffer.write(encoded_subsubitem)
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'BytesType' %}
+                    buffer.write(struct.pack('<H', len(subsubitem)))
+                    buffer.write(subsubitem)
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'StructType' %}
+                    subsubitem._write_to_buffer(buffer)
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'EnumType' %}
+                    buffer.write(struct.pack('{{ field.type.element_type.element_type.element_type | python_enum_backing_type }}', subsubitem.to_int()))
+{% endif %}
+{% endif %}
+{% endif %}
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+        for i in range({{ field.type.size }}):
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+            buffer.write(struct.pack('{{ field.type.element_type | python_struct_format }}', self._{{ field.name }}[i]))
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+            encoded_item = self._{{ field.name }}[i].encode('utf-8')
+            buffer.write(struct.pack('<H', len(encoded_item)))
+            buffer.write(encoded_item)
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+            buffer.write(struct.pack('<H', len(self._{{ field.name }}[i])))
+            buffer.write(self._{{ field.name }}[i])
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+            self._{{ field.name }}[i]._write_to_buffer(buffer)
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+            buffer.write(struct.pack('{{ field.type.element_type | python_enum_backing_type }}', self._{{ field.name }}[i].to_int()))
+{% endif %}
+{% elif field.type.__class__.__name__ == 'StructType' %}
+        self._{{ field.name }}._write_to_buffer(buffer)
+{% elif field.type.__class__.__name__ == 'EnumType' %}
+        buffer.write(struct.pack('{{ field.type | python_enum_backing_type }}', self._{{ field.name }}.to_int()))
+{% endif %}
+{% endfor %}
+    
+    def _read_from_buffer(self, buffer: BytesIO) -> None:
+        """Read struct from buffer using struct module."""
+{% for field in struct.fields %}
+{% if field.type.__class__.__name__ == 'PrimitiveType' %}
+        self._{{ field.name }} = struct.unpack('{{ field.type | python_struct_format }}', buffer.read({{ field.type | python_type_size }}))[0]
+{% elif field.type.__class__.__name__ == 'StringType' %}
+        {{ field.name }}_length = struct.unpack('<H', buffer.read(2))[0]
+        self._{{ field.name }} = buffer.read({{ field.name }}_length).decode('utf-8')
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+        {{ field.name }}_length = struct.unpack('<H', buffer.read(2))[0]
+        self._{{ field.name }} = buffer.read({{ field.name }}_length)
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+        {{ field.name }}_count = struct.unpack('<H', buffer.read(2))[0]
+        self._{{ field.name }} = []
+        for _ in range({{ field.name }}_count):
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+            item = struct.unpack('{{ field.type.element_type | python_struct_format }}', buffer.read({{ field.type.element_type | python_type_size }}))[0]
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+            item_length = struct.unpack('<H', buffer.read(2))[0]
+            item = buffer.read(item_length).decode('utf-8')
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+            item_length = struct.unpack('<H', buffer.read(2))[0]
+            item = buffer.read(item_length)
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+            item = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_buffer(buffer)
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+            value = struct.unpack('{{ field.type.element_type | python_enum_backing_type }}', buffer.read({{ field.type.element_type | python_enum_backing_size }}))[0]
+            item = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_int(value)
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'ArrayType' %}
+            subarray_count = struct.unpack('<H', buffer.read(2))[0]
+            item = []
+            for _ in range(subarray_count):
+{% if field.type.element_type.element_type.__class__.__name__ == 'PrimitiveType' %}
+                subitem = struct.unpack('{{ field.type.element_type.element_type | python_struct_format }}', buffer.read({{ field.type.element_type.element_type | python_type_size }}))[0]
+                item.append(subitem)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'StringType' %}
+                subitem_length = struct.unpack('<H', buffer.read(2))[0]
+                subitem = buffer.read(subitem_length).decode('utf-8')
+                item.append(subitem)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'BytesType' %}
+                subitem_length = struct.unpack('<H', buffer.read(2))[0]
+                subitem = buffer.read(subitem_length)
+                item.append(subitem)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'StructType' %}
+                subitem = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.element_type.name }}.from_buffer(buffer)
+                item.append(subitem)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'EnumType' %}
+                subvalue = struct.unpack('{{ field.type.element_type.element_type | python_enum_backing_type }}', buffer.read({{ field.type.element_type.element_type | python_enum_backing_size }}))[0]
+                subitem = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.element_type.name }}.from_int(subvalue)
+                item.append(subitem)
+{% elif field.type.element_type.element_type.__class__.__name__ == 'ArrayType' %}
+                subsubarray_count = struct.unpack('<H', buffer.read(2))[0]
+                subitem = []
+                for _ in range(subsubarray_count):
+{% if field.type.element_type.element_type.element_type.__class__.__name__ == 'PrimitiveType' %}
+                    subsubitem = struct.unpack('{{ field.type.element_type.element_type.element_type | python_struct_format }}', buffer.read({{ field.type.element_type.element_type.element_type | python_type_size }}))[0]
+                    subitem.append(subsubitem)
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'StringType' %}
+                    subsubitem_length = struct.unpack('<H', buffer.read(2))[0]
+                    subsubitem = buffer.read(subsubitem_length).decode('utf-8')
+                    subitem.append(subsubitem)
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'BytesType' %}
+                    subsubitem_length = struct.unpack('<H', buffer.read(2))[0]
+                    subsubitem = buffer.read(subsubitem_length)
+                    subitem.append(subsubitem)
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'StructType' %}
+                    subsubitem = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.element_type.element_type.name }}.from_buffer(buffer)
+                    subitem.append(subsubitem)
+{% elif field.type.element_type.element_type.element_type.__class__.__name__ == 'EnumType' %}
+                    subsubvalue = struct.unpack('{{ field.type.element_type.element_type.element_type | python_enum_backing_type }}', buffer.read({{ field.type.element_type.element_type.element_type | python_enum_backing_size }}))[0]
+                    subsubitem = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.element_type.element_type.name }}.from_int(subsubvalue)
+                    subitem.append(subsubitem)
+{% endif %}
+                item.append(subitem)
+{% endif %}
+            self._{{ field.name }}.append(item)
+{% endif %}
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+        self._{{ field.name }} = []
+        for _ in range({{ field.type.size }}):
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+            item = struct.unpack('{{ field.type.element_type | python_struct_format }}', buffer.read({{ field.type.element_type | python_type_size }}))[0]
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+            item_length = struct.unpack('<H', buffer.read(2))[0]
+            item = buffer.read(item_length).decode('utf-8')
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+            item_length = struct.unpack('<H', buffer.read(2))[0]
+            item = buffer.read(item_length)
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+            item = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_buffer(buffer)
+            self._{{ field.name }}.append(item)
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+            value = struct.unpack('{{ field.type.element_type | python_enum_backing_type }}', buffer.read({{ field.type.element_type | python_enum_backing_size }}))[0]
+            item = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_int(value)
+            self._{{ field.name }}.append(item)
+{% endif %}
+{% elif field.type.__class__.__name__ == 'StructType' %}
+        self._{{ field.name }} = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.name }}.from_buffer(buffer)
+{% elif field.type.__class__.__name__ == 'EnumType' %}
+        value = struct.unpack('{{ field.type | python_enum_backing_type }}', buffer.read({{ field.type | python_enum_backing_size }}))[0]
+        self._{{ field.name }} = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.name }}.from_int(value)
+{% endif %}
+{% endfor %}
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+{% for field in struct.fields %}
+            "{{ field.name }}": {{ field | python_to_dict_value_with_to_int }},
+{% endfor %}
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Self":
+        """Create instance from dictionary."""
+        kwargs = {}
+{% for field in struct.fields %}
+{% if field.type.__class__.__name__ == 'EnumType' %}
+        if "{{ field.name }}" in data and data["{{ field.name }}"] is not None:
+            kwargs["{{ field.name }}"] = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.name }}.from_int(data["{{ field.name }}"])
+{% elif field.type.__class__.__name__ == 'StructType' %}
+        if "{{ field.name }}" in data and data["{{ field.name }}"] is not None:
+            if isinstance(data["{{ field.name }}"], dict):
+                kwargs["{{ field.name }}"] = {{ namespace_prefix if namespace_prefix else '' }}{{ field.type.name }}.from_dict(data["{{ field.name }}"])
+            else:
+                kwargs["{{ field.name }}"] = data["{{ field.name }}"]
+{% elif field.type.__class__.__name__ == 'ArrayType' and field.type.element_type.__class__.__name__ == 'StructType' %}
+        if "{{ field.name }}" in data and data["{{ field.name }}"] is not None:
+            array_items = []
+            for item_data in data["{{ field.name }}"]:
+                if isinstance(item_data, dict):
+                    array_items.append({{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_dict(item_data))
+                else:
+                    array_items.append(item_data)
+            kwargs["{{ field.name }}"] = array_items
+{% elif field.type.__class__.__name__ == 'ArrayType' and field.type.element_type.__class__.__name__ == 'EnumType' %}
+        if "{{ field.name }}" in data and data["{{ field.name }}"] is not None:
+            array_items = []
+            for item_data in data["{{ field.name }}"]:
+                if isinstance(item_data, int):
+                    array_items.append({{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_int(item_data))
+                else:
+                    array_items.append(item_data)
+            kwargs["{{ field.name }}"] = array_items
+{% elif field.type.__class__.__name__ == 'FixedArrayType' and field.type.element_type.__class__.__name__ == 'StructType' %}
+        if "{{ field.name }}" in data and data["{{ field.name }}"] is not None:
+            array_items = []
+            for item_data in data["{{ field.name }}"]:
+                if isinstance(item_data, dict):
+                    array_items.append({{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_dict(item_data))
+                else:
+                    array_items.append(item_data)
+            kwargs["{{ field.name }}"] = array_items
+{% elif field.type.__class__.__name__ == 'FixedArrayType' and field.type.element_type.__class__.__name__ == 'EnumType' %}
+        if "{{ field.name }}" in data and data["{{ field.name }}"] is not None:
+            array_items = []
+            for item_data in data["{{ field.name }}"]:
+                if isinstance(item_data, int):
+                    array_items.append({{ namespace_prefix if namespace_prefix else '' }}{{ field.type.element_type.name }}.from_int(item_data))
+                else:
+                    array_items.append(item_data)
+            kwargs["{{ field.name }}"] = array_items
+{% else %}
+        kwargs["{{ field.name }}"] = data.get("{{ field.name }}")
+{% endif %}
+{% endfor %}
+        return cls(**kwargs) 

@@ -1,0 +1,49 @@
+namespace test.comprehensive;
+
+enum MessageType : u8 {
+    Ping = 1,
+    Pong = 2,
+    Data = 10,
+    Error = 255,
+}
+
+enum Priority : u16 {
+    Low,
+    Normal = 100,
+    High,
+    Critical = 1000,
+}
+
+struct Point3D {
+    x: f32;
+    y: f32;
+    z: f32;
+}
+
+struct Color {
+    rgba: [u8:4];
+}
+
+struct Metadata {
+    tags: [string:3];
+    values: [f64:2];
+    flags: [bool:4];
+}
+
+struct ComplexData {
+    id: u64;
+    type: MessageType;
+    priority: Priority;
+    timestamp: u64;
+    position: Point3D;
+    color: Color;
+    metadata: Metadata;
+    points: [Point3D:5];
+    priorities: [Priority:3];
+}
+
+message ComplexMessage {
+    header_id: u32;
+    data: ComplexData;
+    checksum: u32;
+} 

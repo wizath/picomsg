@@ -1,0 +1,17 @@
+class {{ namespace_prefix if namespace_prefix else '' }}{{ enum.name }}(IntEnum):
+    """Enum: {{ enum.name }} : {{ enum.backing_type.name }}"""
+{% for value in enum.values %}
+    {{ value.name }} = {{ value.value }}
+{% endfor %}
+
+    @classmethod
+    def from_int(cls, value: int) -> "Self":
+        """Create enum from integer value."""
+        try:
+            return cls(value)
+        except ValueError:
+            raise ValueError(f"Invalid {{ enum.name }} value: {value}")
+
+    def to_int(self) -> int:
+        """Convert enum to integer value."""
+        return int(self.value) 

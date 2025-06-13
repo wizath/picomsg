@@ -1,0 +1,58 @@
+{% if field.type.name == 'u8' %}
+        writer.write_u8(self.{{ field.name }})?;
+{% elif field.type.name == 'i8' %}
+        writer.write_i8(self.{{ field.name }})?;
+{% elif field.type.name == 'u16' %}
+        writer.write_u16::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'i16' %}
+        writer.write_i16::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'u32' %}
+        writer.write_u32::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'i32' %}
+        writer.write_i32::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'u64' %}
+        writer.write_u64::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'i64' %}
+        writer.write_i64::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'f32' %}
+        writer.write_f32::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'f64' %}
+        writer.write_f64::<LittleEndian>(self.{{ field.name }})?;
+{% elif field.type.name == 'bool' %}
+        writer.write_u8(if self.{{ field.name }} { 1 } else { 0 })?;
+{% elif field.type.__class__.__name__ == 'StringType' %}
+        writer.write_u16::<LittleEndian>(self.{{ field.name }}.len() as u16)?;
+        writer.write_all(self.{{ field.name }}.as_bytes())?;
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+        writer.write_u16::<LittleEndian>(self.{{ field.name }}.len() as u16)?;
+        writer.write_all(&self.{{ field.name }})?;
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+        writer.write_u16::<LittleEndian>(self.{{ field.name }}.len() as u16)?;
+        for item in &self.{{ field.name }} {
+{% if field.type.element_type.name in ['u8', 'i8', 'u16', 'i16', 'u32', 'i32', 'u64', 'i64', 'f32', 'f64', 'bool'] %}
+            {{ field.type.element_type | rust_write_expr('item') }}
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+            writer.write_u16::<LittleEndian>(item.len() as u16)?;
+            writer.write_all(item.as_bytes())?;
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+            writer.write_u16::<LittleEndian>(item.len() as u16)?;
+            writer.write_all(item)?;
+{% else %}
+            item.to_writer(writer)?;
+{% endif %}
+        }
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+        for item in &self.{{ field.name }} {
+{% if field.type.element_type.name in ['u8', 'i8', 'u16', 'i16', 'u32', 'i32', 'u64', 'i64', 'f32', 'f64', 'bool'] %}
+            {{ field.type.element_type | rust_write_expr('item') }}
+{% else %}
+            item.to_writer(writer)?;
+{% endif %}
+        }
+{% elif field.type.__class__.__name__ == 'StructType' %}
+        self.{{ field.name }}.to_writer(writer)?;
+{% elif field.type.__class__.__name__ == 'EnumType' %}
+        {{ field.type | rust_enum_backing_write('self.' + field.name) }}
+{% else %}
+        // TODO: Unsupported type for field {{ field.name }}
+{% endif %} 

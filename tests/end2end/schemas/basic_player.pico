@@ -1,0 +1,7 @@
+namespace game;
+
+message Player {
+    id: u32;
+    name: string;
+    health: u32;
+} 

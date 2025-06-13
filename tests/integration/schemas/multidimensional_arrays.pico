@@ -1,0 +1,12 @@
+namespace test.multidim;
+
+struct Matrix2D {
+    rows: [[f32]];
+    width: u32;
+    height: u32;
+}
+
+struct Tensor3D {
+    data: [[[u8]]];
+    dimensions: [u32];
+} 

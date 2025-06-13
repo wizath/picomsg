@@ -1,0 +1,15 @@
+namespace api;
+
+struct Point {
+    x: f32;
+    y: f32;
+}
+
+message UserProfile {
+    id: u32;
+    username: string = "anonymous";
+    email: string;
+    age: u8 = 18;
+    location: Point;
+    verified: bool = false;
+} 

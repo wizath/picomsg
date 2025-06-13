@@ -1,0 +1,106 @@
+{% if field.type.__class__.__name__ == 'PrimitiveType' %}
+  {% if field.type.name in ['u8', 'i8'] %}
+    this.{{ field.name }} = data[offset];
+    offset += 1;
+  {% elif field.type.name in ['u16', 'i16'] %}
+    this.{{ field.name }} = data[offset] | (data[offset + 1] << 8);
+    offset += 2;
+  {% elif field.type.name in ['u32', 'i32'] %}
+    this.{{ field.name }} = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
+    offset += 4;
+  {% elif field.type.name == 'f32' %}
+    const {{ field.name }}F32Bytes = data.slice(offset, offset + 4);
+    this.{{ field.name }} = new Float32Array({{ field.name }}F32Bytes.buffer)[0];
+    offset += 4;
+  {% elif field.type.name == 'f64' %}
+    const {{ field.name }}F64Bytes = data.slice(offset, offset + 8);
+    this.{{ field.name }} = new Float64Array({{ field.name }}F64Bytes.buffer)[0];
+    offset += 8;
+  {% elif field.type.name == 'bool' %}
+    this.{{ field.name }} = data[offset] !== 0;
+    offset += 1;
+  {% endif %}
+{% elif field.type.__class__.__name__ == 'StringType' %}
+    const {{ field.name }}Length = data[offset] | (data[offset + 1] << 8);
+    offset += 2;
+    this.{{ field.name }} = new TextDecoder().decode(data.slice(offset, offset + {{ field.name }}Length));
+    offset += {{ field.name }}Length;
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+    const {{ field.name }}Length = data[offset] | (data[offset + 1] << 8);
+    offset += 2;
+    this.{{ field.name }} = data.slice(offset, offset + {{ field.name }}Length);
+    offset += {{ field.name }}Length;
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+    const {{ field.name }}Count = data[offset] | (data[offset + 1] << 8);
+    offset += 2;
+    this.{{ field.name }} = [];
+    for (let i = 0; i < {{ field.name }}Count; i++) {
+  {% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+    {% if field.type.element_type.name in ['u8', 'i8'] %}
+      this.{{ field.name }}.push(data[offset]);
+      offset += 1;
+    {% elif field.type.element_type.name in ['u16', 'i16'] %}
+      this.{{ field.name }}.push(data[offset] | (data[offset + 1] << 8));
+      offset += 2;
+    {% elif field.type.element_type.name in ['u32', 'i32'] %}
+      this.{{ field.name }}.push(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
+      offset += 4;
+    {% elif field.type.element_type.name == 'f32' %}
+      const {{ field.name }}F32Bytes = data.slice(offset, offset + 4);
+      this.{{ field.name }}.push(new Float32Array({{ field.name }}F32Bytes.buffer)[0]);
+      offset += 4;
+    {% elif field.type.element_type.name == 'f64' %}
+      const {{ field.name }}F64Bytes = data.slice(offset, offset + 8);
+      this.{{ field.name }}.push(new Float64Array({{ field.name }}F64Bytes.buffer)[0]);
+      offset += 8;
+    {% elif field.type.element_type.name == 'bool' %}
+      this.{{ field.name }}.push(data[offset] !== 0);
+      offset += 1;
+    {% endif %}
+  {% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+      const {{ field.name }}ItemLength = data[offset] | (data[offset + 1] << 8);
+      offset += 2;
+      this.{{ field.name }}.push(new TextDecoder().decode(data.slice(offset, offset + {{ field.name }}ItemLength)));
+      offset += {{ field.name }}ItemLength;
+  {% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+      const {{ field.name }}ItemLength = data[offset] | (data[offset + 1] << 8);
+      offset += 2;
+      this.{{ field.name }}.push(data.slice(offset, offset + {{ field.name }}ItemLength));
+      offset += {{ field.name }}ItemLength;
+  {% elif field.type.element_type.__class__.__name__ in ['StructType', 'EnumType'] %}
+    {% if field.type.element_type.__class__.__name__ == 'EnumType' %}
+      this.{{ field.name }}.push(data[offset]);
+      offset += 1;
+    {% else %}
+      const {{ field.name }}Item = new {{ field.type.element_type.name }}();
+      {{ field.name }}Item.fromBytes(data.slice(offset));
+      const {{ field.name }}ItemBytes = {{ field.name }}Item.toBytes();
+      offset += {{ field.name }}ItemBytes.length;
+      this.{{ field.name }}.push({{ field.name }}Item);
+    {% endif %}
+  {% endif %}
+    }
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+  {% if field.type.element_type.__class__.__name__ == 'PrimitiveType' and field.type.element_type.name == 'u8' %}
+    this.{{ field.name }} = [];
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      this.{{ field.name }}.push(data[offset]);
+      offset += 1;
+    }
+  {% else %}
+    // TODO: Complex fixed array deserialization
+  {% endif %}
+{% elif field.type.__class__.__name__ in ['StructType', 'EnumType'] %}
+  {% if field.type.__class__.__name__ == 'EnumType' %}
+    this.{{ field.name }} = data[offset];
+    offset += 1;
+  {% else %}
+    this.{{ field.name }} = new {{ field.type.name }}();
+    const {{ field.name }}StartOffset = offset;
+    this.{{ field.name }}.fromBytes(data.slice(offset));
+    const {{ field.name }}Bytes = this.{{ field.name }}.toBytes();
+    offset += {{ field.name }}Bytes.length;
+  {% endif %}
+{% else %}
+    // TODO: Implement deserialization for {{ field.type.__class__.__name__ }}
+{% endif %} 
