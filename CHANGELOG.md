@@ -5,6 +5,72 @@ All notable changes to PicoMsg will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2025-01-12
+
+### ✨ **Major New Features**
+
+#### Include Statement Support ⭐⭐⭐⭐⭐
+- **Schema Modularity**: Added `include "filename.pico";` syntax for organizing schemas across multiple files
+- **Recursive Resolution**: Automatically resolves nested includes (files that include other files)
+- **Path Handling**: Supports both relative and absolute include paths
+- **Namespace Preservation**: Main file's namespace and version take precedence over included files
+- **Type Merging**: All types from included files become available in the main schema
+- **Conflict Detection**: Prevents naming conflicts between included files with clear error messages
+- **Circular Dependency Detection**: Prevents infinite include loops with proper error handling
+
+#### Enhanced Schema Organization
+- **Modular Design**: Break large schemas into logical components (types, commands, messages)
+- **Code Reuse**: Share common type definitions across multiple schema files
+- **Single Entry Point**: Pass one main schema file to CLI commands, automatically includes dependencies
+- **Maintainability**: Easier to maintain and version complex API definitions
+
+### 🔧 **Implementation Details**
+
+#### Parser Enhancements
+- **Grammar Extension**: Extended Lark grammar with `include_decl` rule
+- **AST Updates**: Schema class now tracks included files in `includes` field
+- **Validation Order**: Schema validation occurs after include resolution to ensure all types are available
+- **Error Handling**: Clear error messages for missing files, circular dependencies, and naming conflicts
+
+#### File Resolution System
+- **Recursive Parsing**: `_parse_file_with_includes()` method handles nested includes
+- **Path Resolution**: Relative paths resolved relative to the including file
+- **Visited Tracking**: Prevents circular dependencies with visited set tracking
+- **Merge Strategy**: `_merge_schemas()` safely combines schemas while checking for conflicts
+
+### 🧪 **Testing & Examples**
+
+#### Comprehensive Test Suite
+- **10 New Tests**: Complete coverage of include functionality scenarios
+- **Edge Cases**: Tests for circular dependencies, naming conflicts, missing files
+- **Path Testing**: Validation of relative/absolute path resolution
+- **Nested Includes**: Tests for complex include hierarchies
+
+#### Example Implementation
+- **examples/includes/**: Complete working example with modular schema organization
+  - `types.pico`: Common data types (Point, Rectangle, Color)
+  - `commands.pico`: Command definitions including types
+  - `main.pico`: Main API schema including commands
+- **Documentation**: README with usage examples and feature overview
+
+### 🚀 **Usage Examples**
+
+```bash
+# Validate schema with includes
+picomsg validate main.pico
+
+# Generate code from main schema (includes all dependencies)
+picomsg compile main.pico --lang python --output generated/ --module-name api
+
+# Works with all existing CLI commands
+picomsg info main.pico
+```
+
+### 🔄 **Backward Compatibility**
+- **Full Compatibility**: All existing schemas continue to work unchanged
+- **Optional Feature**: Include statements are optional - no impact on existing code
+- **CLI Unchanged**: No changes to existing CLI command syntax or behavior
+
 ## [0.5.1] - 2024-12-19
 
 ### 🐛 **Critical Bug Fixes**

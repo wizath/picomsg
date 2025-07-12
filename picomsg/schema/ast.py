@@ -356,8 +356,13 @@ class Schema:
     structs: List[Struct]
     messages: List[Message]
     version: Optional[int] = None
+    includes: List[str] = None
     
     def __post_init__(self):
+        # Initialize includes if None
+        if self.includes is None:
+            self.includes = []
+        
         # Check for duplicate enum names
         enum_names = [e.name for e in self.enums]
         if len(enum_names) != len(set(enum_names)):

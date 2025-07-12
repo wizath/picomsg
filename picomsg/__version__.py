@@ -2,16 +2,16 @@
 Version information for PicoMsg.
 """
 
-__version__ = "0.5.1"
-__version_info__ = (0, 5, 1)
+__version__ = "0.6.0"
+__version_info__ = (0, 6, 0)
 
 # Version components
 MAJOR = 0
-MINOR = 5
-PATCH = 1
+MINOR = 6
+PATCH = 0
 
 # Build metadata
-BUILD_DATE = "2024-12-19"
+BUILD_DATE = "2025-01-12"
 BUILD_STATUS = "alpha"
 
 def get_version():

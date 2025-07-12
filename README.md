@@ -11,6 +11,7 @@ PicoMsg is a binary serialization format optimized for embedded systems and perf
 - **Zero-copy deserialization** in C with memory-aligned structures
 - **Compact binary format** with minimal overhead and direct `memcpy()` operations
 - **Multi-language support** with code generation for C, Rust, Python, and TypeScript
+- **Modular schema organization** with include statements for code reuse and maintainability
 - **Comprehensive JSON system** with validation, streaming, and pretty-printing
 - **Schema definition language** with support for enums, structs, messages, and complex nesting
 - **Cross-language JSON interoperability** for debugging and API development
@@ -29,7 +30,7 @@ pip install picomsg
 
 ### 2. Define Your Schema
 
-Create a `.pico` schema file:
+Create a `.pico` schema file (supports include statements for modular organization):
 
 ```picomsg
 version 2;
@@ -303,6 +304,58 @@ Every schema file must start with a version declaration and namespace:
 ```picomsg
 version 2;
 namespace com.example.api;
+```
+
+### Include Statements
+
+Organize large schemas across multiple files using include statements:
+
+```picomsg
+// shared_types.pico
+struct Point {
+    x: f32;
+    y: f32;
+}
+
+enum Color : u8 {
+    RED = 1,
+    GREEN = 2,
+    BLUE = 3
+}
+```
+
+```picomsg
+// main.pico
+include "shared_types.pico";
+
+version 2;
+namespace com.example.api;
+
+message DrawCommand {
+    position: Point;  // From shared_types.pico
+    color: Color;     // From shared_types.pico
+    size: f32;
+}
+```
+
+#### Include Features
+
+- **Recursive includes**: Files can include other files that also have includes
+- **Path resolution**: Relative paths resolved relative to the including file
+- **Namespace preservation**: Main file's namespace takes precedence
+- **Conflict detection**: Prevents naming conflicts with clear error messages
+- **Circular dependency detection**: Prevents infinite include loops
+
+#### Usage with CLI
+
+Pass the main schema file to any CLI command - includes are resolved automatically:
+
+```bash
+# Validates main.pico and all included files
+picomsg validate main.pico
+
+# Generates code from merged schema
+picomsg compile main.pico --lang python --output generated/
 ```
 
 ### Data Types

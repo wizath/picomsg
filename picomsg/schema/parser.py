@@ -18,12 +18,14 @@ from .ast import (
 PICOMSG_GRAMMAR = r"""
     start: item*
 
-    item: namespace_decl
+    item: include_decl
+        | namespace_decl
         | version_decl
         | enum_decl
         | struct_decl
         | message_decl
 
+    include_decl: "include" STRING ";"
     namespace_decl: "namespace" QUALIFIED_NAME ";"
     version_decl: "version" NUMBER ";"
 
@@ -106,9 +108,12 @@ class SchemaTransformer(Transformer):
         enums = []
         structs = []
         messages = []
+        includes = []
         
         for item in items:
-            if isinstance(item, Namespace):
+            if isinstance(item, str) and item.startswith('include:'):
+                includes.append(item[8:])  # Remove 'include:' prefix
+            elif isinstance(item, Namespace):
                 if namespace is not None:
                     raise ValueError("Multiple namespace declarations not allowed")
                 namespace = item
@@ -123,7 +128,7 @@ class SchemaTransformer(Transformer):
             elif isinstance(item, Message):
                 messages.append(item)
         
-        return Schema(namespace=namespace, enums=enums, structs=structs, messages=messages, version=version)
+        return Schema(namespace=namespace, enums=enums, structs=structs, messages=messages, version=version, includes=includes)
 
     @v_args(inline=True)
     def item(self, content):
@@ -132,6 +137,14 @@ class SchemaTransformer(Transformer):
     @v_args(inline=True)
     def type(self, type_content):
         return type_content
+
+    @v_args(inline=True)
+    def include_decl(self, path):
+        # Strip quotes from path string if present
+        path_str = str(path)
+        if path_str.startswith('"') and path_str.endswith('"'):
+            path_str = path_str[1:-1]
+        return f'include:{path_str}'
 
     @v_args(inline=True)
     def namespace_decl(self, name):
@@ -258,17 +271,89 @@ class SchemaParser:
             raise ValueError(f"Parse error: {e}") from e
     
     def parse_file(self, file_path: Union[str, Path]) -> Schema:
-        """Parse schema from file."""
-        path = Path(file_path)
+        """Parse schema from file with include resolution."""
+        return self._parse_file_with_includes(file_path, set())
+    
+    def _parse_file_with_includes(self, file_path: Union[str, Path], visited: set) -> Schema:
+        """Parse schema from file and recursively resolve includes."""
+        path = Path(file_path).resolve()
+        
+        if str(path) in visited:
+            raise ValueError(f"Circular dependency detected: {path}")
+        
         if not path.exists():
             raise FileNotFoundError(f"Schema file not found: {path}")
+        
+        visited.add(str(path))
         
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            return self.parse_string(content)
+            
+            # Parse the current file without validation first
+            try:
+                tree = self._parser.parse(content)
+                schema = self._transformer.transform(tree)
+            except LarkError as e:
+                raise ValueError(f"Parse error: {e}") from e
+            
+            # Process includes
+            if schema.includes:
+                for include_path in schema.includes:
+                    # Resolve include path relative to current file
+                    if not Path(include_path).is_absolute():
+                        include_path = path.parent / include_path
+                    
+                    # Parse included file
+                    included_schema = self._parse_file_with_includes(include_path, visited.copy())
+                    
+                    # Merge included schema into current schema
+                    schema = self._merge_schemas(schema, included_schema)
+            
+            # Validate merged schema
+            self._validate_schema(schema)
+            
+            visited.remove(str(path))
+            return schema
+            
         except Exception as e:
+            visited.discard(str(path))
             raise ValueError(f"Error reading schema file {path}: {e}") from e
+    
+    def _merge_schemas(self, main_schema: Schema, included_schema: Schema) -> Schema:
+        """Merge an included schema into the main schema."""
+        # Check for naming conflicts
+        main_names = set()
+        for enum in main_schema.enums:
+            main_names.add(enum.name)
+        for struct in main_schema.structs:
+            main_names.add(struct.name)
+        for message in main_schema.messages:
+            main_names.add(message.name)
+        
+        included_names = set()
+        for enum in included_schema.enums:
+            if enum.name in main_names:
+                raise ValueError(f"Type name conflict: '{enum.name}' already defined")
+            included_names.add(enum.name)
+        for struct in included_schema.structs:
+            if struct.name in main_names or struct.name in included_names:
+                raise ValueError(f"Type name conflict: '{struct.name}' already defined")
+            included_names.add(struct.name)
+        for message in included_schema.messages:
+            if message.name in main_names or message.name in included_names:
+                raise ValueError(f"Type name conflict: '{message.name}' already defined")
+            included_names.add(message.name)
+        
+        # Create merged schema
+        return Schema(
+            namespace=main_schema.namespace,  # Keep main namespace
+            enums=main_schema.enums + included_schema.enums,
+            structs=main_schema.structs + included_schema.structs,
+            messages=main_schema.messages + included_schema.messages,
+            version=main_schema.version,  # Keep main version
+            includes=main_schema.includes  # Keep original includes list
+        )
     
     def _validate_schema(self, schema: Schema) -> None:
         """Validate the parsed schema for semantic correctness."""
