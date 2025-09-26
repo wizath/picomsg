@@ -33,13 +33,20 @@ class RustCodeGenerator(CodeGenerator):
     def _build_context(self) -> Dict:
         """Build template context."""
         namespace_prefix = self._get_namespace_prefix()
-        
+
+        # Also provide PascalCase namespace for new naming convention
+        pascal_namespace = ''
+        if self.schema.namespace:
+            parts = self.schema.namespace.name.replace('.', '_').split('_')
+            pascal_namespace = ''.join(word.capitalize() for word in parts)
+
         context = {
             'schema': self.schema,
             'namespace_prefix': namespace_prefix,
+            'pascal_namespace': pascal_namespace,
             'module_name': self.get_option('module_name', 'picomsg_generated'),
         }
-        
+
         return context
     
     def _get_namespace_prefix(self) -> str:

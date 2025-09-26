@@ -5,6 +5,18 @@ All notable changes to PicoMsg will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2025-09-26
+
+### Changed
+- Improved Rust code generation naming convention to use `PascalCase_PascalCase` format
+  - Types now generate as `UartProtocol_Command` instead of `UartProtocolcommand`
+  - Enum variants now use PascalCase (`Echo`, `Status`) instead of UPPER_CASE (`ECHO`, `STATUS`)
+  - Better readability with clear namespace/type separation using underscore
+
+### Fixed
+- Rust naming convention now properly handles multi-word types and enum variants
+- Consistent type naming across all Rust templates (enums, structs, trait implementations)
+
 ## [0.6.0] - 2025-01-12
 
 ### ✨ **Major New Features**

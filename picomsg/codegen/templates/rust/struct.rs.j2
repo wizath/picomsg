@@ -1,24 +1,24 @@
 /// Struct: {{ struct.name }}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct {{ namespace_prefix }}{{ struct.name }} {
+pub struct {{ pascal_namespace }}_{{ struct.name | replace('_', ' ') | title | replace(' ', '') }} {
 {% for field in struct.fields %}
-    pub {{ field.name }}: {{ field.type | rust_type_with_namespace(namespace_prefix) }},
+    pub {{ field.name }}: {{ field.type | rust_type_with_namespace(pascal_namespace) }},
 {% endfor %}
 }
 
-impl {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Serialize for {{ namespace_prefix }}{{ struct.name }} {
-    fn from_bytes(data: &[u8]) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> {
+impl {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Serialize for {{ pascal_namespace }}_{{ struct.name | replace('_', ' ') | title | replace(' ', '') }} {
+    fn from_bytes(data: &[u8]) -> {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Result<Self> {
         let mut cursor = std::io::Cursor::new(data);
         Self::from_reader(&mut cursor)
     }
 
-    fn to_bytes(&self) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Vec<u8>> {
+    fn to_bytes(&self) -> {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Result<Vec<u8>> {
         let mut buffer = Vec::new();
         self.to_writer(&mut buffer)?;
         Ok(buffer)
     }
 
-    fn from_reader<R: Read>(reader: &mut R) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> {
+    fn from_reader<R: Read>(reader: &mut R) -> {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Result<Self> {
         Ok(Self {
 {% for field in struct.fields %}
 {% include 'rust/field_read.rs.j2' %}
@@ -26,21 +26,21 @@ impl {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Serialize for {{ n
         })
     }
 
-    fn to_writer<W: Write>(&self, writer: &mut W) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<()> {
+    fn to_writer<W: Write>(&self, writer: &mut W) -> {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Result<()> {
 {% for field in struct.fields %}
 {% include 'rust/field_write.rs.j2' %}
 {% endfor %}
         Ok(())
     }
 
-    fn to_base64(&self) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<String> {
+    fn to_base64(&self) -> {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Result<String> {
         let bytes = self.to_bytes()?;
         Ok(general_purpose::STANDARD.encode(&bytes))
     }
 
-    fn from_base64(base64_str: &str) -> {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Result<Self> {
+    fn from_base64(base64_str: &str) -> {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Result<Self> {
         let bytes = general_purpose::STANDARD.decode(base64_str)
-            .map_err(|_| {{ namespace_prefix if namespace_prefix else 'PicoMsg' }}Error::InvalidData)?;
+            .map_err(|_| {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Error::InvalidData)?;
         Self::from_bytes(&bytes)
     }
 } 

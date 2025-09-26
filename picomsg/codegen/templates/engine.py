@@ -304,7 +304,10 @@ class TemplateEngine:
             else:
                 return f'Vec<{element_type}>'  # Complex types use Vec
         elif isinstance(type_obj, (StructType, EnumType)):
-            return f'{namespace_prefix}{type_obj.name}'
+            # Convert type name to PascalCase
+            type_name_parts = type_obj.name.split('_')
+            pascal_case_name = ''.join(word.capitalize() for word in type_name_parts)
+            return f'{namespace_prefix}_{pascal_case_name}'
         
         return 'String'
 
