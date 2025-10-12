@@ -73,7 +73,7 @@ export abstract class {{ base_class }} implements PicoMsgSerializable {
 }
 
 {% for enum in schema.enums %}
-export enum {{ enum.name }} {
+export enum {{ namespace_prefix }}{{ enum.name }} {
   {% for value in enum.values %}
   {{ value.name }} = {{ value.value }},
   {% endfor %}

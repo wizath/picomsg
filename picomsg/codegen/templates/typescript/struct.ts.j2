@@ -1,9 +1,9 @@
-export class {{ struct.name }} extends {{ base_class }} {
+export class {{ namespace_prefix }}{{ struct.name }} extends {{ base_class }} {
   {% for field in struct.fields %}
   {{ field.name }}: {{ field.type | ts_type }} = {{ field.type | ts_default_with_schema }};
   {% endfor %}
 
-  constructor(data?: Partial<{{ struct.name }}>) {
+  constructor(data?: Partial<{{ namespace_prefix }}{{ struct.name }}>) {
     super();
     {% for field in struct.fields %}
     this.{{ field.name }} = data?.{{ field.name }} ?? {{ field.type | ts_default_with_schema }};

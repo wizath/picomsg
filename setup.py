@@ -22,6 +22,12 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/picomsg/picomsg",
     packages=find_packages(),
+    package_data={
+        'picomsg': [
+            'codegen/templates/**/*.j2',
+        ],
+    },
+    include_package_data=True,
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",

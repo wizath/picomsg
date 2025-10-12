@@ -35,10 +35,11 @@ class PythonCodeGenerator(CodeGenerator):
         """Get namespace prefix for class names."""
         if not self.schema.namespace:
             return ''
-        
-        # Convert namespace to PascalCase prefix
+
+        # Convert namespace to PascalCase prefix with trailing underscore
         parts = self.schema.namespace.name.split('.')
-        return ''.join(part.capitalize() for part in parts)
+        prefix = ''.join(part.capitalize() for part in parts)
+        return prefix + '_' if prefix else ''
     
     def _sanitize_identifier(self, name: str) -> str:
         """Sanitize identifier for Python."""

@@ -119,14 +119,17 @@ class TestCCodeGenerator:
         ])
         schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
         generator = CCodeGenerator(schema)
-        
+
         files = generator.generate()
         header = files['picomsg_generated.h']
-        
-        # Variable-size types should be represented as length/count prefixes
-        assert 'uint16_t name;' in header  # String length prefix
-        assert 'uint16_t data;' in header  # Bytes length prefix
-        assert 'uint16_t numbers;' in header  # Array count prefix
+
+        # Variable-size types should be represented as pointer + length
+        assert 'uint8_t* name;' in header  # String pointer
+        assert 'uint16_t name_len;' in header  # String length
+        assert 'uint8_t* data;' in header  # Bytes pointer
+        assert 'uint16_t data_len;' in header  # Bytes length
+        assert 'uint32_t* numbers;' in header  # Array pointer
+        assert 'uint16_t numbers_len;' in header  # Array length
     
     def test_generate_struct_references(self):
         """Test generating code with struct type references."""
@@ -179,20 +182,21 @@ class TestCCodeGenerator:
         ])
         schema = Schema(namespace=None, enums=[], structs=[], messages=[message])
         generator = CCodeGenerator(schema)
-        
+
         files = generator.generate()
         header = files['picomsg_generated.h']
         impl = files['picomsg_generated.c']
-        
+
         # Check message type ID
         assert 'TESTMESSAGE_TYPE_ID 1' in header
-        
+
         # Check message struct definition
         assert 'typedef struct __attribute__((packed))' in header
         assert 'uint32_t id;' in header
-        assert 'uint16_t data;' in header
+        assert 'uint8_t* data;' in header  # Variable-length bytes field
+        assert 'uint16_t data_len;' in header  # Length field
         assert '} testmessage_t;' in header
-        
+
         # Check function declarations and implementations
         assert 'testmessage_from_bytes(' in header
         assert 'testmessage_to_bytes(' in header
@@ -268,17 +272,18 @@ class TestCCodeGenerator:
         """Test C type mapping."""
         schema = Schema(namespace=None, enums=[], structs=[], messages=[])
         generator = CCodeGenerator(schema)
-        
+
         # Test primitive type mappings
         assert generator._get_c_type(PrimitiveType(name='u8')) == 'uint8_t'
         assert generator._get_c_type(PrimitiveType(name='i32')) == 'int32_t'
         assert generator._get_c_type(PrimitiveType(name='f64')) == 'double'
-        
-        # Test variable-size type mappings
+
+        # Test variable-size type mappings (returns base type for array elements)
+        # Note: struct generation handles pointer+length separately
         assert generator._get_c_type(StringType()) == 'uint16_t'
         assert generator._get_c_type(BytesType()) == 'uint16_t'
         assert generator._get_c_type(ArrayType(element_type=PrimitiveType(name='u8'))) == 'uint16_t'
-        
+
         # Test struct type mapping
         assert generator._get_c_type(StructType(name='Point')) == 'point_t'
     
@@ -572,14 +577,171 @@ class TestCCodeGenerator:
         struct = Struct(name="Point", fields=[
             Field(name="x", type=PrimitiveType(name="f32"))
         ])
-        
+
         schema = Schema(namespace=namespace, enums=[], structs=[struct], messages=[], version=10)
         generator = CCodeGenerator(schema)
         generator.set_option('structs_only', True)
         files = generator.generate()
-        
+
         header_content = files["picomsg_generated.h"]
-        
+
         # Should NOT contain version define in structs-only mode
         assert "TEST_VERSION" not in header_content
-        assert "#define" not in header_content or "#ifndef" in header_content  # Only header guards 
+        assert "#define" not in header_content or "#ifndef" in header_content  # Only header guards
+
+    def test_variable_length_array_serialization(self):
+        """Test that variable-length arrays generate proper serialization code."""
+        struct = Struct(name='Packet', fields=[
+            Field(name='id', type=PrimitiveType(name='u32')),
+            Field(name='payload', type=ArrayType(element_type=PrimitiveType(name='u8'))),
+        ])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
+        generator = CCodeGenerator(schema)
+
+        files = generator.generate()
+        impl = files['picomsg_generated.c']
+
+        # Check that serialization code reads u16 length prefix
+        assert 'out->payload_len = data[offset] | (data[offset + 1] << 8);' in impl
+        assert 'offset += 2;' in impl
+        assert 'out->payload = (uint8_t*)(data + offset);' in impl
+        assert 'offset += out->payload_len * 1;' in impl
+
+        # Check that deserialization code writes u16 length prefix
+        assert 'buf[offset] = msg->payload_len & 0xFF;' in impl
+        assert 'buf[offset + 1] = (msg->payload_len >> 8) & 0xFF;' in impl
+        assert 'memcpy(buf + offset, msg->payload, msg->payload_len * 1);' in impl
+
+    def test_variable_length_array_with_different_types(self):
+        """Test variable-length arrays with different element types."""
+        struct = Struct(name='DataBlock', fields=[
+            Field(name='bytes_data', type=ArrayType(element_type=PrimitiveType(name='u8'))),
+            Field(name='int_data', type=ArrayType(element_type=PrimitiveType(name='u32'))),
+            Field(name='float_data', type=ArrayType(element_type=PrimitiveType(name='f32'))),
+        ])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
+        generator = CCodeGenerator(schema)
+
+        files = generator.generate()
+        header = files['picomsg_generated.h']
+        impl = files['picomsg_generated.c']
+
+        # Check struct definitions
+        assert 'uint8_t* bytes_data;' in header
+        assert 'uint16_t bytes_data_len;' in header
+        assert 'uint32_t* int_data;' in header
+        assert 'uint16_t int_data_len;' in header
+        assert 'float* float_data;' in header
+        assert 'uint16_t float_data_len;' in header
+
+        # Check element sizes are correct
+        assert 'offset += out->bytes_data_len * 1;' in impl  # u8 = 1 byte
+        assert 'offset += out->int_data_len * 4;' in impl    # u32 = 4 bytes
+        assert 'offset += out->float_data_len * 4;' in impl  # f32 = 4 bytes
+
+    def test_mixed_fixed_and_variable_arrays(self):
+        """Test struct with both fixed and variable-length arrays."""
+        from picomsg.schema.ast import FixedArrayType
+
+        struct = Struct(name='MixedArrays', fields=[
+            Field(name='fixed_data', type=FixedArrayType(element_type=PrimitiveType(name='u8'), size=16)),
+            Field(name='variable_data', type=ArrayType(element_type=PrimitiveType(name='u8'))),
+            Field(name='value', type=PrimitiveType(name='u32')),
+        ])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
+        generator = CCodeGenerator(schema)
+
+        files = generator.generate()
+        header = files['picomsg_generated.h']
+        impl = files['picomsg_generated.c']
+
+        # Check struct has both fixed and variable arrays
+        assert 'uint8_t fixed_data[16];' in header
+        assert 'uint8_t* variable_data;' in header
+        assert 'uint16_t variable_data_len;' in header
+
+        # Check serialization handles both types correctly
+        assert 'memcpy(out->fixed_data, data + offset, 16);' in impl  # Fixed array
+        assert 'out->variable_data_len = data[offset] | (data[offset + 1] << 8);' in impl  # Variable array
+        assert 'out->variable_data = (uint8_t*)(data + offset);' in impl
+
+    def test_string_and_bytes_fields(self):
+        """Test string and bytes fields generate variable-length code."""
+        struct = Struct(name='TextData', fields=[
+            Field(name='name', type=StringType()),
+            Field(name='data', type=BytesType()),
+        ])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
+        generator = CCodeGenerator(schema)
+
+        files = generator.generate()
+        header = files['picomsg_generated.h']
+        impl = files['picomsg_generated.c']
+
+        # Both string and bytes should use uint8_t* with length
+        assert 'uint8_t* name;' in header
+        assert 'uint16_t name_len;' in header
+        assert 'uint8_t* data;' in header
+        assert 'uint16_t data_len;' in header
+
+        # Check serialization code
+        assert 'out->name_len = data[offset] | (data[offset + 1] << 8);' in impl
+        assert 'out->data_len = data[offset] | (data[offset + 1] << 8);' in impl
+
+    def test_buffer_size_checks_for_variable_arrays(self):
+        """Test that proper buffer size checks are generated."""
+        struct = Struct(name='Packet', fields=[
+            Field(name='payload', type=ArrayType(element_type=PrimitiveType(name='u8'))),
+        ])
+        schema = Schema(namespace=None, enums=[], structs=[struct], messages=[])
+        generator = CCodeGenerator(schema)
+
+        files = generator.generate()
+        impl = files['picomsg_generated.c']
+
+        # Check buffer size validation before reading length
+        assert 'if (offset + 2 > len) return ERROR_BUFFER_TOO_SMALL;' in impl
+
+        # Check buffer size validation before reading array data
+        assert 'if (offset + out->payload_len * 1 > len) return ERROR_BUFFER_TOO_SMALL;' in impl
+
+        # Check buffer size validation for serialization
+        assert 'if (offset + 2 + msg->payload_len * 1 > *len) return ERROR_BUFFER_TOO_SMALL;' in impl
+
+    def test_variable_length_message_functions(self):
+        """Test that messages with variable-length fields generate proper functions."""
+        message = Message(name='DataMessage', fields=[
+            Field(name='id', type=PrimitiveType(name='u32')),
+            Field(name='payload', type=ArrayType(element_type=PrimitiveType(name='u8'))),
+        ])
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[message])
+        generator = CCodeGenerator(schema)
+
+        files = generator.generate()
+        impl = files['picomsg_generated.c']
+
+        # Check message serialization functions exist
+        assert 'datamessage_from_bytes(' in impl
+        assert 'datamessage_to_bytes(' in impl
+
+        # Check proper variable-length handling
+        assert 'size_t offset = 0;' in impl
+        assert 'out->payload_len = data[offset] | (data[offset + 1] << 8);' in impl
+
+    def test_get_type_size_helper(self):
+        """Test _get_type_size helper method."""
+        schema = Schema(namespace=None, enums=[], structs=[], messages=[])
+        generator = CCodeGenerator(schema)
+
+        # Test primitive type sizes
+        assert generator._get_type_size(PrimitiveType(name='u8')) == 1
+        assert generator._get_type_size(PrimitiveType(name='i8')) == 1
+        assert generator._get_type_size(PrimitiveType(name='bool')) == 1
+        assert generator._get_type_size(PrimitiveType(name='u16')) == 2
+        assert generator._get_type_size(PrimitiveType(name='i16')) == 2
+        assert generator._get_type_size(PrimitiveType(name='u32')) == 4
+        assert generator._get_type_size(PrimitiveType(name='i32')) == 4
+        assert generator._get_type_size(PrimitiveType(name='f32')) == 4
+        assert generator._get_type_size(PrimitiveType(name='u64')) == 8
+        assert generator._get_type_size(PrimitiveType(name='i64')) == 8
+        assert generator._get_type_size(PrimitiveType(name='f64')) == 8 

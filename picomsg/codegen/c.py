@@ -177,52 +177,62 @@ class CCodeGenerator(CodeGenerator):
         """Generate C struct definition."""
         namespace_prefix = self._get_namespace_prefix()
         struct_name = f"{namespace_prefix}{struct.name.lower()}_t"
-        
+
         lines = [
             f"// Struct: {struct.name}",
             f"typedef struct {get_c_packed_attribute()} {{",
         ]
-        
+
         # Generate fields
         for field in struct.fields:
             if isinstance(field.type, FixedArrayType):
                 element_type = self._get_c_type(field.type.element_type)
                 lines.append(f"    {element_type} {field.name}[{field.type.size}];")
+            elif isinstance(field.type, (ArrayType, StringType, BytesType)):
+                # Variable-length types need pointer + length
+                element_type = self._get_c_type(field.type.element_type) if isinstance(field.type, ArrayType) else "uint8_t"
+                lines.append(f"    {element_type}* {field.name};")
+                lines.append(f"    uint16_t {field.name}_len;")
             else:
                 c_type = self._get_c_type(field.type)
                 lines.append(f"    {c_type} {field.name};")
-        
+
         lines.append(f"}} {struct_name};")
-        
+
         # Generate initialization macro with defaults
         lines.extend(self._generate_init_macro(struct.name, struct.fields))
-        
+
         return lines
     
     def _generate_message_definition(self, message: Message) -> List[str]:
         """Generate C message definition."""
         namespace_prefix = self._get_namespace_prefix()
         message_name = f"{namespace_prefix}{message.name.lower()}_t"
-        
+
         lines = [
             f"// Message: {message.name}",
             f"typedef struct {get_c_packed_attribute()} {{",
         ]
-        
+
         # Generate fields
         for field in message.fields:
             if isinstance(field.type, FixedArrayType):
                 element_type = self._get_c_type(field.type.element_type)
                 lines.append(f"    {element_type} {field.name}[{field.type.size}];")
+            elif isinstance(field.type, (ArrayType, StringType, BytesType)):
+                # Variable-length types need pointer + length
+                element_type = self._get_c_type(field.type.element_type) if isinstance(field.type, ArrayType) else "uint8_t"
+                lines.append(f"    {element_type}* {field.name};")
+                lines.append(f"    uint16_t {field.name}_len;")
             else:
                 c_type = self._get_c_type(field.type)
                 lines.append(f"    {c_type} {field.name};")
-        
+
         lines.append(f"}} {message_name};")
-        
+
         # Generate initialization macro with defaults
         lines.extend(self._generate_init_macro(message.name, message.fields))
-        
+
         return lines
     
     def _generate_function_declarations(self) -> List[str]:
@@ -257,29 +267,69 @@ class CCodeGenerator(CodeGenerator):
         namespace_prefix = self._get_namespace_prefix()
         struct_name = f"{namespace_prefix}{struct.name.lower()}_t"
         func_prefix = f"{namespace_prefix}{struct.name.lower()}"
-        
-        lines = [
-            f"// {struct.name} serialization functions",
-            f"{namespace_prefix}error_t {func_prefix}_from_bytes(",
-            f"    const uint8_t* data, size_t len, {struct_name}* out) {{",
-            f"    if (!data || !out) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
-            f"    if (len < sizeof({struct_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
-            f"    ",
-            f"    memcpy(out, data, sizeof({struct_name}));",
-            f"    return {namespace_prefix.upper()}OK;",
-            f"}}",
-            f"",
-            f"{namespace_prefix}error_t {func_prefix}_to_bytes(",
-            f"    const {struct_name}* msg, uint8_t* buf, size_t* len) {{",
-            f"    if (!msg || !buf || !len) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
-            f"    if (*len < sizeof({struct_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
-            f"    ",
-            f"    memcpy(buf, msg, sizeof({struct_name}));",
-            f"    *len = sizeof({struct_name});",
-            f"    return {namespace_prefix.upper()}OK;",
-            f"}}",
-        ]
-        
+
+        # Check if struct has variable-length fields
+        has_varlen = any(isinstance(f.type, (ArrayType, StringType, BytesType)) for f in struct.fields)
+
+        if not has_varlen:
+            # Simple memcpy for fixed-size structs
+            lines = [
+                f"// {struct.name} serialization functions",
+                f"{namespace_prefix}error_t {func_prefix}_from_bytes(",
+                f"    const uint8_t* data, size_t len, {struct_name}* out) {{",
+                f"    if (!data || !out) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    if (len < sizeof({struct_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    ",
+                f"    memcpy(out, data, sizeof({struct_name}));",
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+                f"",
+                f"{namespace_prefix}error_t {func_prefix}_to_bytes(",
+                f"    const {struct_name}* msg, uint8_t* buf, size_t* len) {{",
+                f"    if (!msg || !buf || !len) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    if (*len < sizeof({struct_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    ",
+                f"    memcpy(buf, msg, sizeof({struct_name}));",
+                f"    *len = sizeof({struct_name});",
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+            ]
+        else:
+            # Complex serialization for variable-length fields
+            lines = [
+                f"// {struct.name} serialization functions",
+                f"{namespace_prefix}error_t {func_prefix}_from_bytes(",
+                f"    const uint8_t* data, size_t len, {struct_name}* out) {{",
+                f"    if (!data || !out) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    size_t offset = 0;",
+                f"",
+            ]
+
+            # Generate deserialization for each field
+            for field in struct.fields:
+                lines.extend(self._generate_field_deserialize(field, namespace_prefix))
+
+            lines.extend([
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+                f"",
+                f"{namespace_prefix}error_t {func_prefix}_to_bytes(",
+                f"    const {struct_name}* msg, uint8_t* buf, size_t* len) {{",
+                f"    if (!msg || !buf || !len) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    size_t offset = 0;",
+                f"",
+            ])
+
+            # Generate serialization for each field
+            for field in struct.fields:
+                lines.extend(self._generate_field_serialize(field, namespace_prefix))
+
+            lines.extend([
+                f"    *len = offset;",
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+            ])
+
         return lines
     
     def _generate_message_functions(self, message: Message) -> List[str]:
@@ -287,31 +337,175 @@ class CCodeGenerator(CodeGenerator):
         namespace_prefix = self._get_namespace_prefix()
         message_name = f"{namespace_prefix}{message.name.lower()}_t"
         func_prefix = f"{namespace_prefix}{message.name.lower()}"
-        
-        lines = [
-            f"// {message.name} serialization functions",
-            f"{namespace_prefix}error_t {func_prefix}_from_bytes(",
-            f"    const uint8_t* data, size_t len, {message_name}* out) {{",
-            f"    if (!data || !out) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
-            f"    if (len < sizeof({message_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
-            f"    ",
-            f"    memcpy(out, data, sizeof({message_name}));",
-            f"    return {namespace_prefix.upper()}OK;",
-            f"}}",
-            f"",
-            f"{namespace_prefix}error_t {func_prefix}_to_bytes(",
-            f"    const {message_name}* msg, uint8_t* buf, size_t* len) {{",
-            f"    if (!msg || !buf || !len) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
-            f"    if (*len < sizeof({message_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
-            f"    ",
-            f"    memcpy(buf, msg, sizeof({message_name}));",
-            f"    *len = sizeof({message_name});",
-            f"    return {namespace_prefix.upper()}OK;",
-            f"}}",
-        ]
-        
+
+        # Check if message has variable-length fields
+        has_varlen = any(isinstance(f.type, (ArrayType, StringType, BytesType)) for f in message.fields)
+
+        if not has_varlen:
+            # Simple memcpy for fixed-size messages
+            lines = [
+                f"// {message.name} serialization functions",
+                f"{namespace_prefix}error_t {func_prefix}_from_bytes(",
+                f"    const uint8_t* data, size_t len, {message_name}* out) {{",
+                f"    if (!data || !out) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    if (len < sizeof({message_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    ",
+                f"    memcpy(out, data, sizeof({message_name}));",
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+                f"",
+                f"{namespace_prefix}error_t {func_prefix}_to_bytes(",
+                f"    const {message_name}* msg, uint8_t* buf, size_t* len) {{",
+                f"    if (!msg || !buf || !len) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    if (*len < sizeof({message_name})) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    ",
+                f"    memcpy(buf, msg, sizeof({message_name}));",
+                f"    *len = sizeof({message_name});",
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+            ]
+        else:
+            # Complex serialization for variable-length fields
+            lines = [
+                f"// {message.name} serialization functions",
+                f"{namespace_prefix}error_t {func_prefix}_from_bytes(",
+                f"    const uint8_t* data, size_t len, {message_name}* out) {{",
+                f"    if (!data || !out) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    size_t offset = 0;",
+                f"",
+            ]
+
+            # Generate deserialization for each field
+            for field in message.fields:
+                lines.extend(self._generate_field_deserialize(field, namespace_prefix))
+
+            lines.extend([
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+                f"",
+                f"{namespace_prefix}error_t {func_prefix}_to_bytes(",
+                f"    const {message_name}* msg, uint8_t* buf, size_t* len) {{",
+                f"    if (!msg || !buf || !len) return {namespace_prefix.upper()}ERROR_NULL_POINTER;",
+                f"    size_t offset = 0;",
+                f"",
+            ])
+
+            # Generate serialization for each field
+            for field in message.fields:
+                lines.extend(self._generate_field_serialize(field, namespace_prefix))
+
+            lines.extend([
+                f"    *len = offset;",
+                f"    return {namespace_prefix.upper()}OK;",
+                f"}}",
+            ])
+
         return lines
     
+    def _generate_field_deserialize(self, field: Field, namespace_prefix: str) -> List[str]:
+        """Generate deserialization code for a single field."""
+        lines = []
+
+        if isinstance(field.type, (ArrayType, StringType, BytesType)):
+            # Variable-length field: read u16 length, then data
+            element_type = self._get_c_type(field.type.element_type) if isinstance(field.type, ArrayType) else "uint8_t"
+            element_size = self._get_type_size(field.type.element_type if isinstance(field.type, ArrayType) else PrimitiveType("u8"))
+
+            lines.extend([
+                f"    // Field: {field.name} (variable-length)",
+                f"    if (offset + 2 > len) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    out->{field.name}_len = data[offset] | (data[offset + 1] << 8);",
+                f"    offset += 2;",
+                f"    if (offset + out->{field.name}_len * {element_size} > len) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    out->{field.name} = ({element_type}*)(data + offset);",
+                f"    offset += out->{field.name}_len * {element_size};",
+                f"",
+            ])
+        elif isinstance(field.type, FixedArrayType):
+            # Fixed array
+            element_size = self._get_type_size(field.type.element_type)
+            total_size = element_size * field.type.size
+            lines.extend([
+                f"    // Field: {field.name} (fixed array)",
+                f"    if (offset + {total_size} > len) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    memcpy(out->{field.name}, data + offset, {total_size});",
+                f"    offset += {total_size};",
+                f"",
+            ])
+        else:
+            # Primitive field
+            size = self._get_type_size(field.type)
+            lines.extend([
+                f"    // Field: {field.name}",
+                f"    if (offset + {size} > len) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    memcpy(&out->{field.name}, data + offset, {size});",
+                f"    offset += {size};",
+                f"",
+            ])
+
+        return lines
+
+    def _generate_field_serialize(self, field: Field, namespace_prefix: str) -> List[str]:
+        """Generate serialization code for a single field."""
+        lines = []
+
+        if isinstance(field.type, (ArrayType, StringType, BytesType)):
+            # Variable-length field: write u16 length, then data
+            element_size = self._get_type_size(field.type.element_type if isinstance(field.type, ArrayType) else PrimitiveType("u8"))
+
+            lines.extend([
+                f"    // Field: {field.name} (variable-length)",
+                f"    if (offset + 2 + msg->{field.name}_len * {element_size} > *len) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    buf[offset] = msg->{field.name}_len & 0xFF;",
+                f"    buf[offset + 1] = (msg->{field.name}_len >> 8) & 0xFF;",
+                f"    offset += 2;",
+                f"    memcpy(buf + offset, msg->{field.name}, msg->{field.name}_len * {element_size});",
+                f"    offset += msg->{field.name}_len * {element_size};",
+                f"",
+            ])
+        elif isinstance(field.type, FixedArrayType):
+            # Fixed array
+            element_size = self._get_type_size(field.type.element_type)
+            total_size = element_size * field.type.size
+            lines.extend([
+                f"    // Field: {field.name} (fixed array)",
+                f"    if (offset + {total_size} > *len) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    memcpy(buf + offset, msg->{field.name}, {total_size});",
+                f"    offset += {total_size};",
+                f"",
+            ])
+        else:
+            # Primitive field
+            size = self._get_type_size(field.type)
+            lines.extend([
+                f"    // Field: {field.name}",
+                f"    if (offset + {size} > *len) return {namespace_prefix.upper()}ERROR_BUFFER_TOO_SMALL;",
+                f"    memcpy(buf + offset, &msg->{field.name}, {size});",
+                f"    offset += {size};",
+                f"",
+            ])
+
+        return lines
+
+    def _get_type_size(self, type_: Type) -> int:
+        """Get size of a type in bytes."""
+        if isinstance(type_, PrimitiveType):
+            type_sizes = {
+                'u8': 1, 'i8': 1, 'bool': 1,
+                'u16': 2, 'i16': 2,
+                'u32': 4, 'i32': 4, 'f32': 4,
+                'u64': 8, 'i64': 8, 'f64': 8,
+            }
+            return type_sizes.get(type_.name, 1)
+        elif isinstance(type_, StructType):
+            # For structs, we'd need to calculate the size - for now return 0 to indicate complex type
+            return 0
+        elif isinstance(type_, EnumType):
+            # Enums use their backing type size
+            return self._get_type_size(type_.backing_type) if hasattr(type_, 'backing_type') else 4
+        else:
+            return 1
+
     def _get_c_type(self, type_: Type) -> str:
         """Convert PicoMsg type to C type."""
         if isinstance(type_, PrimitiveType):

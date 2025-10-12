@@ -5,6 +5,33 @@ All notable changes to PicoMsg will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2025-10-12
+
+### Added
+- **C Generator Variable-Length Arrays**: Proper support for `[Type]`, `string`, and `bytes` types
+  - Struct fields now generate pointer + length: `Type* field; uint16_t field_len;`
+  - Proper deserialization reads u16 length prefix, validates buffer, then points to data
+  - Proper serialization writes u16 length prefix then data
+  - Zero-copy deserialization for optimal performance
+  - Added `_get_type_size()` helper for element size calculations
+  - Added `_generate_field_serialize()` and `_generate_field_deserialize()` methods
+  - 8 comprehensive tests for variable-length array handling
+
+### Changed
+- **Consistent Cross-Language Naming**: Fixed namespace prefix handling
+  - Python: `Lars_` prefix (was `Lars` without underscore)
+  - TypeScript: `Lars_` prefix for all types (was missing namespace prefix)
+  - Constants now use single underscore: `LARS_MAGIC_BYTE_1` (was `LARS__MAGIC_BYTE_1`)
+  - All generators now produce consistent `Namespace_TypeName` format
+
+### Fixed
+- **Setup.py Package Data**: Added `package_data` to include Jinja2 templates in distribution
+  - Templates now properly installed with package
+  - Fixed "template not found" errors when using pip-installed package
+- **C Generator**: Updated tests to match new variable-length array behavior
+  - `test_generate_messages` now checks for pointer + length fields
+  - `test_get_c_type_mapping` updated with proper documentation
+
 ## [0.6.1] - 2025-09-26
 
 ### Changed

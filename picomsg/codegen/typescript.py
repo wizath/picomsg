@@ -10,11 +10,20 @@ from .templates import TemplateEngine
 
 class TypeScriptCodeGenerator(CodeGenerator):
     """Generate TypeScript code using Jinja2 templates."""
-    
+
     def __init__(self, schema):
         super().__init__(schema)
         self.template_engine = TemplateEngine()
         self.type_id_counter = 1
+
+    def _get_namespace_prefix_capitalized(self) -> str:
+        """Get namespace prefix with PascalCase for TypeScript."""
+        if not self.schema.namespace:
+            return ''
+
+        parts = self.schema.namespace.name.split('.')
+        prefix = ''.join(part.capitalize() for part in parts)
+        return prefix + '_' if prefix else ''
     
     def generate(self) -> Dict[str, str]:
         """Generate TypeScript module files using templates."""
@@ -36,8 +45,8 @@ class TypeScriptCodeGenerator(CodeGenerator):
     
     def _build_context(self, module_name: str) -> Dict[str, Any]:
         """Build template context with all necessary data."""
-        namespace_prefix = self._get_namespace_prefix()
-        
+        namespace_prefix = self._get_namespace_prefix_capitalized()
+
         return {
             'schema': self.schema,
             'namespace': self.schema.namespace,
@@ -45,7 +54,7 @@ class TypeScriptCodeGenerator(CodeGenerator):
             'namespace_prefix': namespace_prefix,
             'base_class': f'{namespace_prefix}Base' if namespace_prefix else 'PicoMsgBase',
             'error_class': f'{namespace_prefix}Error' if namespace_prefix else 'PicoMsgError',
-            'const_prefix': namespace_prefix.upper() + '_' if namespace_prefix else '',
+            'const_prefix': namespace_prefix.rstrip('_').upper() + '_' if namespace_prefix else '',
             'version': self.schema.version or 1,
             'message_type_ids': self._generate_message_type_ids(),
         }
@@ -89,30 +98,31 @@ class TypeScriptCodeGenerator(CodeGenerator):
         ]
         
         # Generate enum declarations
+        namespace_prefix = context['namespace_prefix']
         for enum in self.schema.enums:
             lines.extend([
-                f'export declare enum {enum.name} {{',
+                f'export declare enum {namespace_prefix}{enum.name} {{',
                 *[f'  {value.name} = {value.value},' for value in enum.values],
                 '}',
                 '',
             ])
-        
+
         # Generate struct declarations
         for struct in self.schema.structs:
             lines.extend([
-                f'export declare class {struct.name} extends {base_name} {{',
+                f'export declare class {namespace_prefix}{struct.name} extends {base_name} {{',
                 *[f'  {field.name}: {self.template_engine._ts_type(field.type)};' for field in struct.fields],
-                f'  constructor(data?: Partial<{struct.name}>);',
+                f'  constructor(data?: Partial<{namespace_prefix}{struct.name}>);',
                 '}',
                 '',
             ])
-        
+
         # Generate message declarations
         for message in self.schema.messages:
             lines.extend([
-                f'export declare class {message.name} extends {base_name} {{',
+                f'export declare class {namespace_prefix}{message.name} extends {base_name} {{',
                 *[f'  {field.name}: {self.template_engine._ts_type(field.type)};' for field in message.fields],
-                f'  constructor(data?: Partial<{message.name}>);',
+                f'  constructor(data?: Partial<{namespace_prefix}{message.name}>);',
                 '}',
                 '',
             ])

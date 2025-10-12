@@ -9,14 +9,14 @@ from typing import Dict, Any, Optional, Union, List
 from io import BytesIO
 
 # PicoMsg format constants
-{{ namespace_prefix | upper if namespace_prefix else 'PICOMSG' }}_MAGIC_BYTE_1 = 0xAB
-{{ namespace_prefix | upper if namespace_prefix else 'PICOMSG' }}_MAGIC_BYTE_2 = 0xCD
-{{ namespace_prefix | upper if namespace_prefix else 'PICOMSG' }}_VERSION = {{ schema.version if schema.version else 1 }}
-{{ namespace_prefix | upper if namespace_prefix else 'PICOMSG' }}_HEADER_SIZE = 8
+{{ namespace_prefix.rstrip('_') | upper if namespace_prefix else 'PICOMSG' }}_MAGIC_BYTE_1 = 0xAB
+{{ namespace_prefix.rstrip('_') | upper if namespace_prefix else 'PICOMSG' }}_MAGIC_BYTE_2 = 0xCD
+{{ namespace_prefix.rstrip('_') | upper if namespace_prefix else 'PICOMSG' }}_VERSION = {{ schema.version if schema.version else 1 }}
+{{ namespace_prefix.rstrip('_') | upper if namespace_prefix else 'PICOMSG' }}_HEADER_SIZE = 8
 
 # Message type IDs
 {% for message in schema.messages %}
-{{ namespace_prefix | upper if namespace_prefix else 'PICOMSG' }}_{{ message.name | upper }}_TYPE_ID = {{ loop.index }}
+{{ namespace_prefix.rstrip('_') | upper if namespace_prefix else 'PICOMSG' }}_{{ message.name | upper }}_TYPE_ID = {{ loop.index }}
 {% endfor %}
 
 # Error classes
