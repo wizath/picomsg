@@ -81,14 +81,54 @@
   {% endif %}
     }
 {% elif field.type.__class__.__name__ == 'FixedArrayType' %}
-  {% if field.type.element_type.__class__.__name__ == 'PrimitiveType' and field.type.element_type.name == 'u8' %}
     this.{{ field.name }} = [];
+  {% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+    {% if field.type.element_type.name in ['u8', 'i8'] %}
     for (let i = 0; i < {{ field.type.size }}; i++) {
       this.{{ field.name }}.push(data[offset]);
       offset += 1;
     }
-  {% else %}
-    // TODO: Complex fixed array deserialization
+    {% elif field.type.element_type.name in ['u16', 'i16'] %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      this.{{ field.name }}.push(data[offset] | (data[offset + 1] << 8));
+      offset += 2;
+    }
+    {% elif field.type.element_type.name in ['u32', 'i32'] %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      this.{{ field.name }}.push(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
+      offset += 4;
+    }
+    {% elif field.type.element_type.name == 'f32' %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      const {{ field.name }}F32Bytes = data.slice(offset, offset + 4);
+      this.{{ field.name }}.push(new Float32Array({{ field.name }}F32Bytes.buffer)[0]);
+      offset += 4;
+    }
+    {% elif field.type.element_type.name == 'f64' %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      const {{ field.name }}F64Bytes = data.slice(offset, offset + 8);
+      this.{{ field.name }}.push(new Float64Array({{ field.name }}F64Bytes.buffer)[0]);
+      offset += 8;
+    }
+    {% elif field.type.element_type.name == 'bool' %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      this.{{ field.name }}.push(data[offset] !== 0);
+      offset += 1;
+    }
+    {% endif %}
+  {% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      const {{ field.name }}Item = new {{ namespace_prefix }}{{ field.type.element_type.name }}();
+      {{ field.name }}Item.fromBytes(data.slice(offset));
+      const {{ field.name }}ItemBytes = {{ field.name }}Item.toBytes();
+      offset += {{ field.name }}ItemBytes.length;
+      this.{{ field.name }}.push({{ field.name }}Item);
+    }
+  {% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+    for (let i = 0; i < {{ field.type.size }}; i++) {
+      this.{{ field.name }}.push(data[offset]);
+      offset += 1;
+    }
   {% endif %}
 {% elif field.type.__class__.__name__ in ['StructType', 'EnumType'] %}
   {% if field.type.__class__.__name__ == 'EnumType' %}
