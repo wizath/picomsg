@@ -5,6 +5,16 @@ All notable changes to PicoMsg will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.3] - 2025-11-29
+
+### Fixed
+- **TypeScript Generator**: Fixed enum value initialization when first value is non-zero
+  - Enums with explicit starting values (e.g., `FOO = 1`) now generate correctly
+  - Previously would generate `FOO,` instead of `FOO = 1,`
+
+### Changed
+- Minor code cleanup in TypeScript template
+
 ## [0.6.2] - 2025-10-12
 
 ### Added

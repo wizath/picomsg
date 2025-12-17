@@ -2,13 +2,13 @@
 Version information for PicoMsg.
 """
 
-__version__ = "0.6.3"
-__version_info__ = (0, 6, 3)
+__version__ = "0.6.4"
+__version_info__ = (0, 6, 4)
 
 # Version components
 MAJOR = 0
 MINOR = 6
-PATCH = 3
+PATCH = 4
 
 # Build metadata
 BUILD_DATE = "2025-10-12"

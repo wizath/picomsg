@@ -37,9 +37,6 @@ class TypeScriptCodeGenerator(CodeGenerator):
             'typescript/module.ts.j2', context
         )
         files[f"{module_name}.d.ts"] = self._generate_declarations(context)
-        files["package.json"] = self._generate_package_json(module_name)
-        files["tsconfig.json"] = self._generate_tsconfig()
-        files["README.md"] = self._generate_readme(module_name)
         
         return files
     
