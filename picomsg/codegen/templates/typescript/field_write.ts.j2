@@ -9,6 +9,16 @@
     buffer.push((this.{{ field.name }} >> 8) & 0xFF);
     buffer.push((this.{{ field.name }} >> 16) & 0xFF);
     buffer.push((this.{{ field.name }} >> 24) & 0xFF);
+  {% elif field.type.name == 'u64' %}
+    const {{ field.name }}U64Buffer = new ArrayBuffer(8);
+    const {{ field.name }}U64View = new DataView({{ field.name }}U64Buffer);
+    {{ field.name }}U64View.setBigUint64(0, this.{{ field.name }}, true);
+    buffer.push(...new Uint8Array({{ field.name }}U64Buffer));
+  {% elif field.type.name == 'i64' %}
+    const {{ field.name }}I64Buffer = new ArrayBuffer(8);
+    const {{ field.name }}I64View = new DataView({{ field.name }}I64Buffer);
+    {{ field.name }}I64View.setBigInt64(0, this.{{ field.name }}, true);
+    buffer.push(...new Uint8Array({{ field.name }}I64Buffer));
   {% elif field.type.name == 'f32' %}
     const {{ field.name }}F32Array = new Float32Array([this.{{ field.name }}]);
     const {{ field.name }}F32Bytes = new Uint8Array({{ field.name }}F32Array.buffer);
@@ -44,6 +54,16 @@
       buffer.push(({{ field.name }}Item >> 8) & 0xFF);
       buffer.push(({{ field.name }}Item >> 16) & 0xFF);
       buffer.push(({{ field.name }}Item >> 24) & 0xFF);
+    {% elif field.type.element_type.name == 'u64' %}
+      const {{ field.name }}ItemU64Buffer = new ArrayBuffer(8);
+      const {{ field.name }}ItemU64View = new DataView({{ field.name }}ItemU64Buffer);
+      {{ field.name }}ItemU64View.setBigUint64(0, {{ field.name }}Item, true);
+      buffer.push(...new Uint8Array({{ field.name }}ItemU64Buffer));
+    {% elif field.type.element_type.name == 'i64' %}
+      const {{ field.name }}ItemI64Buffer = new ArrayBuffer(8);
+      const {{ field.name }}ItemI64View = new DataView({{ field.name }}ItemI64Buffer);
+      {{ field.name }}ItemI64View.setBigInt64(0, {{ field.name }}Item, true);
+      buffer.push(...new Uint8Array({{ field.name }}ItemI64Buffer));
     {% elif field.type.element_type.name == 'f32' %}
       const {{ field.name }}ItemF32Array = new Float32Array([{{ field.name }}Item]);
       const {{ field.name }}ItemF32Bytes = new Uint8Array({{ field.name }}ItemF32Array.buffer);
