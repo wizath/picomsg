@@ -387,15 +387,145 @@ def test_typescript_sanitize_identifier():
 
 def test_typescript_generator_with_version():
     """Test TypeScript generation with schema version."""
-    schema = Schema(enums=[], 
+    schema = Schema(enums=[],
         namespace=Namespace("test.versioned"),
         structs=[],
         messages=[],
         version=42
     )
-    
+
     generator = TypeScriptCodeGenerator(schema)
     files = generator.generate()
     content = files["picomsg-generated.ts"]
-    
-    assert "export const TEST_VERSIONED__VERSION = 42;" in content 
+
+    assert "export const TEST_VERSIONED__VERSION = 42;" in content
+
+
+def test_typescript_generator_u64_i64_types():
+    """Test TypeScript generation uses bigint for u64/i64 types."""
+    schema = Schema(enums=[],
+        namespace=None,
+        structs=[
+            Struct("Bitmasks", [
+                Field("valid_mask", PrimitiveType("u64")),
+                Field("enabled_mask", PrimitiveType("u64")),
+                Field("signed_value", PrimitiveType("i64")),
+            ])
+        ],
+        messages=[]
+    )
+
+    generator = TypeScriptCodeGenerator(schema)
+    files = generator.generate()
+    content = files["picomsg-generated.ts"]
+
+    # Check bigint type declarations
+    assert "valid_mask: bigint = 0n;" in content
+    assert "enabled_mask: bigint = 0n;" in content
+    assert "signed_value: bigint = 0n;" in content
+
+    # Check constructor uses bigint defaults
+    assert "this.valid_mask = data?.valid_mask ?? 0n;" in content
+    assert "this.enabled_mask = data?.enabled_mask ?? 0n;" in content
+    assert "this.signed_value = data?.signed_value ?? 0n;" in content
+
+
+def test_typescript_generator_u64_serialization():
+    """Test TypeScript u64 serialization uses DataView with BigInt."""
+    schema = Schema(enums=[],
+        namespace=None,
+        structs=[
+            Struct("U64Struct", [
+                Field("value", PrimitiveType("u64")),
+            ])
+        ],
+        messages=[]
+    )
+
+    generator = TypeScriptCodeGenerator(schema)
+    files = generator.generate()
+    content = files["picomsg-generated.ts"]
+
+    # Check toBytes uses DataView with setBigUint64
+    assert "new ArrayBuffer(8)" in content
+    assert "new DataView(" in content
+    assert "setBigUint64(0, this.value, true)" in content
+
+    # Check fromBytes uses DataView with getBigUint64
+    assert "getBigUint64(0, true)" in content
+
+
+def test_typescript_generator_i64_serialization():
+    """Test TypeScript i64 serialization uses DataView with BigInt."""
+    schema = Schema(enums=[],
+        namespace=None,
+        structs=[
+            Struct("I64Struct", [
+                Field("value", PrimitiveType("i64")),
+            ])
+        ],
+        messages=[]
+    )
+
+    generator = TypeScriptCodeGenerator(schema)
+    files = generator.generate()
+    content = files["picomsg-generated.ts"]
+
+    # Check toBytes uses DataView with setBigInt64
+    assert "setBigInt64(0, this.value, true)" in content
+
+    # Check fromBytes uses DataView with getBigInt64
+    assert "getBigInt64(0, true)" in content
+
+
+def test_typescript_generator_u64_declaration_file():
+    """Test TypeScript declaration file uses bigint for u64/i64."""
+    schema = Schema(enums=[],
+        namespace=None,
+        structs=[
+            Struct("Masks", [
+                Field("u64_field", PrimitiveType("u64")),
+                Field("i64_field", PrimitiveType("i64")),
+                Field("u32_field", PrimitiveType("u32")),
+            ])
+        ],
+        messages=[]
+    )
+
+    generator = TypeScriptCodeGenerator(schema)
+    files = generator.generate()
+    declarations = files["picomsg-generated.d.ts"]
+
+    # Check u64/i64 use bigint in declarations
+    assert "u64_field: bigint;" in declarations
+    assert "i64_field: bigint;" in declarations
+    # Check u32 still uses number
+    assert "u32_field: number;" in declarations
+
+
+def test_typescript_generator_u64_array():
+    """Test TypeScript generation with arrays of u64/i64."""
+    schema = Schema(enums=[],
+        namespace=None,
+        structs=[
+            Struct("U64Arrays", [
+                Field("values", ArrayType(PrimitiveType("u64"))),
+                Field("signed_values", ArrayType(PrimitiveType("i64"))),
+            ])
+        ],
+        messages=[]
+    )
+
+    generator = TypeScriptCodeGenerator(schema)
+    files = generator.generate()
+    content = files["picomsg-generated.ts"]
+
+    # Check array type declarations use bigint[]
+    assert "values: bigint[] = [];" in content
+    assert "signed_values: bigint[] = [];" in content
+
+    # Check array element serialization uses DataView
+    assert "setBigUint64" in content
+    assert "getBigUint64" in content
+    assert "setBigInt64" in content
+    assert "getBigInt64" in content

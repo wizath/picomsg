@@ -8,6 +8,14 @@
   {% elif field.type.name in ['u32', 'i32'] %}
     this.{{ field.name }} = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24);
     offset += 4;
+  {% elif field.type.name == 'u64' %}
+    const {{ field.name }}View = new DataView(data.buffer, data.byteOffset + offset, 8);
+    this.{{ field.name }} = {{ field.name }}View.getBigUint64(0, true);
+    offset += 8;
+  {% elif field.type.name == 'i64' %}
+    const {{ field.name }}View = new DataView(data.buffer, data.byteOffset + offset, 8);
+    this.{{ field.name }} = {{ field.name }}View.getBigInt64(0, true);
+    offset += 8;
   {% elif field.type.name == 'f32' %}
     const {{ field.name }}F32Bytes = data.slice(offset, offset + 4);
     this.{{ field.name }} = new Float32Array({{ field.name }}F32Bytes.buffer)[0];
@@ -45,6 +53,14 @@
     {% elif field.type.element_type.name in ['u32', 'i32'] %}
       this.{{ field.name }}.push(data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16) | (data[offset + 3] << 24));
       offset += 4;
+    {% elif field.type.element_type.name == 'u64' %}
+      const {{ field.name }}ItemView = new DataView(data.buffer, data.byteOffset + offset, 8);
+      this.{{ field.name }}.push({{ field.name }}ItemView.getBigUint64(0, true));
+      offset += 8;
+    {% elif field.type.element_type.name == 'i64' %}
+      const {{ field.name }}ItemView = new DataView(data.buffer, data.byteOffset + offset, 8);
+      this.{{ field.name }}.push({{ field.name }}ItemView.getBigInt64(0, true));
+      offset += 8;
     {% elif field.type.element_type.name == 'f32' %}
       const {{ field.name }}F32Bytes = data.slice(offset, offset + 4);
       this.{{ field.name }}.push(new Float32Array({{ field.name }}F32Bytes.buffer)[0]);

@@ -142,10 +142,12 @@ class TemplateEngine:
     def _ts_type(type_obj) -> str:
         """Convert PicoMsg type to TypeScript type."""
         from ...schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
-        
+
         if isinstance(type_obj, PrimitiveType):
-            if type_obj.name in ['u8', 'u16', 'u32', 'u64', 'i8', 'i16', 'i32', 'i64', 'f32', 'f64']:
+            if type_obj.name in ['u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'f32', 'f64']:
                 return 'number'
+            elif type_obj.name in ['u64', 'i64']:
+                return 'bigint'
             elif type_obj.name == 'bool':
                 return 'boolean'
         elif isinstance(type_obj, StringType):
@@ -164,10 +166,12 @@ class TemplateEngine:
     def _ts_default(type_obj, schema=None) -> str:
         """Get default value for TypeScript type."""
         from ...schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
-        
+
         if isinstance(type_obj, PrimitiveType):
-            if type_obj.name in ['u8', 'u16', 'u32', 'u64', 'i8', 'i16', 'i32', 'i64', 'f32', 'f64']:
+            if type_obj.name in ['u8', 'u16', 'u32', 'i8', 'i16', 'i32', 'f32', 'f64']:
                 return '0'
+            elif type_obj.name in ['u64', 'i64']:
+                return '0n'
             elif type_obj.name == 'bool':
                 return 'false'
         elif isinstance(type_obj, StringType):
