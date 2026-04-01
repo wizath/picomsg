@@ -1,0 +1,34 @@
+// {{ message.name }} message
+type {{ namespace_prefix }}{{ message.name | pascal_case }} struct {
+{% for field in message.fields %}
+	{{ field.name | pascal_case }} {{ field.type | go_type_with_namespace(namespace_prefix) }}
+{% endfor %}
+}
+
+func (s *{{ namespace_prefix }}{{ message.name | pascal_case }}) ToBytes() ([]byte, error) {
+	var buf bytes.Buffer
+	if err := s.WriteTo(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (s *{{ namespace_prefix }}{{ message.name | pascal_case }}) FromBytes(data []byte) error {
+	r := bytes.NewReader(data)
+	return s.ReadFrom(r)
+}
+
+func (s *{{ namespace_prefix }}{{ message.name | pascal_case }}) WriteTo(w io.Writer) error {
+{% for field in message.fields %}
+{% include 'go/field_write.go.j2' %}
+{% endfor %}
+	return nil
+}
+
+func (s *{{ namespace_prefix }}{{ message.name | pascal_case }}) ReadFrom(r io.Reader) error {
+	var err error
+{% for field in message.fields %}
+{% include 'go/field_read.go.j2' %}
+{% endfor %}
+	return nil
+}

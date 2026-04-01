@@ -11,6 +11,7 @@ from .codegen.c import CCodeGenerator
 from .codegen.rust import RustCodeGenerator
 from .codegen.python import PythonCodeGenerator
 from .codegen.typescript import TypeScriptCodeGenerator
+from .codegen.go import GoCodeGenerator
 from .json.cli_integration import add_json_commands
 
 
@@ -227,7 +228,7 @@ def json_info(schema_file: Path, format: str):
 @main.command()
 @click.argument('schema_file', type=click.Path(exists=True, path_type=Path))
 @click.option('--lang', '-l', 
-              type=click.Choice(['c', 'rust', 'python', 'javascript', 'typescript']),
+              type=click.Choice(['c', 'rust', 'python', 'javascript', 'typescript', 'go']),
               default='c',
               help='Target language for code generation')
 @click.option('--output', '-o',
@@ -277,6 +278,10 @@ def compile(schema_file: Path, lang: str, output: Path, header_name: str, module
             generator = TypeScriptCodeGenerator(schema)
             generator.set_option('module_name', module_name)
             click.echo(f"Generating TypeScript code with module name: {module_name}")
+        elif lang == 'go':
+            generator = GoCodeGenerator(schema)
+            generator.set_option('module_name', module_name)
+            click.echo(f"Generating Go code with module name: {module_name}")
         else:
             raise click.ClickException(f"Language '{lang}' not yet implemented")
         

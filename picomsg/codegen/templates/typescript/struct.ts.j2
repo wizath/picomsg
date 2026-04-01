@@ -1,6 +1,6 @@
 export class {{ namespace_prefix }}{{ struct.name }} extends {{ base_class }} {
   {% for field in struct.fields %}
-  {{ field.name }}: {{ field.type | ts_type }} = {{ field.type | ts_default_with_schema }};
+  {{ field.name }}: {{ field.type | ts_type_with_schema }} = {{ field.type | ts_default_with_schema }};
   {% endfor %}
 
   constructor(data?: Partial<{{ namespace_prefix }}{{ struct.name }}>) {

@@ -88,7 +88,7 @@
       this.{{ field.name }}.push(data[offset]);
       offset += 1;
     {% else %}
-      const {{ field.name }}Item = new {{ field.type.element_type.name }}();
+      const {{ field.name }}Item = new {{ namespace_prefix }}{{ field.type.element_type.name }}();
       {{ field.name }}Item.fromBytes(data.slice(offset));
       const {{ field.name }}ItemBytes = {{ field.name }}Item.toBytes();
       offset += {{ field.name }}ItemBytes.length;
@@ -151,7 +151,7 @@
     this.{{ field.name }} = data[offset];
     offset += 1;
   {% else %}
-    this.{{ field.name }} = new {{ field.type.name }}();
+    this.{{ field.name }} = new {{ namespace_prefix }}{{ field.type.name }}();
     const {{ field.name }}StartOffset = offset;
     this.{{ field.name }}.fromBytes(data.slice(offset));
     const {{ field.name }}Bytes = this.{{ field.name }}.toBytes();

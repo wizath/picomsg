@@ -62,6 +62,14 @@ class TemplateEngine:
         self.env.filters['python_enum_backing_type'] = self._python_enum_backing_type
         self.env.filters['python_enum_backing_size'] = self._python_enum_backing_size
         
+        # Go-specific filters
+        self.env.filters['go_type'] = self._go_type
+        self.env.filters['go_default'] = self._go_default
+        self.env.filters['go_type_with_namespace'] = self._go_type_with_namespace
+        self.env.filters['go_read_expr'] = self._go_read_expr
+        self.env.filters['go_write_expr'] = self._go_write_expr
+        self.env.filters['go_enum_backing_type'] = self._go_enum_backing_type_static
+
         # Schema-aware filters (these need to be set per render call)
         self._current_schema = None
     
@@ -84,7 +92,9 @@ class TemplateEngine:
         self.env.filters['python_enum_backing_size'] = lambda type_obj: self._python_enum_backing_size(type_obj, self._current_schema)
         self.env.filters['python_default_value'] = lambda type_obj: self._python_default_value_with_schema(type_obj, self._current_schema)
         self.env.filters['python_default_value_with_schema'] = lambda type_obj, schema: self._python_default_value_with_schema(type_obj, schema)
-        
+        self.env.filters['go_enum_backing_type'] = lambda type_obj: self._go_enum_backing_type(type_obj, self._current_schema)
+        self.env.filters['ts_type_with_schema'] = lambda type_obj: self._ts_type_with_schema(type_obj, self._current_schema)
+
         template = self.env.get_template(template_name)
         return template.render(**context)
     
@@ -116,8 +126,9 @@ class TemplateEngine:
     
     @staticmethod
     def _pascal_case(name: str) -> str:
-        """Convert name to PascalCase."""
-        return ''.join(word.capitalize() for word in name.split('_'))
+        """Convert name to PascalCase. Preserves existing casing within segments."""
+        parts = name.split('_')
+        return ''.join(part[0].upper() + part[1:] if part else '' for part in parts)
     
     @staticmethod
     def _upper_snake_case(name: str) -> str:
@@ -185,13 +196,33 @@ class TemplateEngine:
             if schema:
                 for enum in schema.enums:
                     if enum.name == type_obj.name and enum.values:
-                        return f'{type_obj.name}.{enum.values[0].name}'
+                        prefix = ''
+                        if schema.namespace:
+                            parts = schema.namespace.name.split('.')
+                            prefix = ''.join(p[0].upper() + p[1:] if p else '' for p in parts)
+                        return f'{prefix}{type_obj.name}.{enum.values[0].name}'
             return '0'
         elif isinstance(type_obj, StructType):
-            return f'new {type_obj.name}()'
-        
+            prefix = ''
+            if schema and schema.namespace:
+                parts = schema.namespace.name.split('.')
+                prefix = ''.join(part[0].upper() + part[1:] if part else '' for part in parts)
+            return f'new {prefix}{type_obj.name}()'
+
         return 'null'
-    
+
+    @staticmethod
+    def _ts_type_with_schema(type_obj, schema) -> str:
+        from ...schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
+        if isinstance(type_obj, (StructType, EnumType)) and schema and schema.namespace:
+            parts = schema.namespace.name.split('.')
+            prefix = ''.join(p[0].upper() + p[1:] if p else '' for p in parts)
+            return f'{prefix}{type_obj.name}'
+        elif isinstance(type_obj, (ArrayType, FixedArrayType)):
+            element = TemplateEngine._ts_type_with_schema(type_obj.element_type, schema)
+            return f'{element}[]'
+        return TemplateEngine._ts_type(type_obj)
+
     @staticmethod
     def _py_type(type_obj) -> str:
         """Convert PicoMsg type to Python type hint."""
@@ -310,8 +341,8 @@ class TemplateEngine:
         elif isinstance(type_obj, (StructType, EnumType)):
             # Convert type name to PascalCase
             type_name_parts = type_obj.name.split('_')
-            pascal_case_name = ''.join(word.capitalize() for word in type_name_parts)
-            return f'{namespace_prefix}_{pascal_case_name}'
+            pascal_case_name = ''.join(word[0].upper() + word[1:] if word else '' for word in type_name_parts)
+            return f'{namespace_prefix}{pascal_case_name}'
         
         return 'String'
 
@@ -642,4 +673,107 @@ class TemplateEngine:
             struct_name = f'{namespace_prefix}{type_obj.name}' if namespace_prefix else type_obj.name
             return f'{struct_name}()'
         
-        return 'None' 
+        return 'None'
+
+    # ── Go filters ──────────────────────────────────────────────────
+
+    @staticmethod
+    def _go_type(type_obj) -> str:
+        from ...schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
+
+        type_map = {
+            'u8': 'uint8', 'i8': 'int8',
+            'u16': 'uint16', 'i16': 'int16',
+            'u32': 'uint32', 'i32': 'int32',
+            'u64': 'uint64', 'i64': 'int64',
+            'f32': 'float32', 'f64': 'float64',
+            'bool': 'bool',
+        }
+        if isinstance(type_obj, PrimitiveType):
+            return type_map.get(type_obj.name, 'uint8')
+        elif isinstance(type_obj, StringType):
+            return 'string'
+        elif isinstance(type_obj, BytesType):
+            return '[]byte'
+        elif isinstance(type_obj, ArrayType):
+            return f'[]{TemplateEngine._go_type(type_obj.element_type)}'
+        elif isinstance(type_obj, FixedArrayType):
+            return f'[{type_obj.size}]{TemplateEngine._go_type(type_obj.element_type)}'
+        elif isinstance(type_obj, (StructType, EnumType)):
+            return type_obj.name
+        return 'uint8'
+
+    @staticmethod
+    def _go_default(type_obj) -> str:
+        from ...schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
+
+        if isinstance(type_obj, PrimitiveType):
+            if type_obj.name in ('f32', 'f64'):
+                return '0.0'
+            elif type_obj.name == 'bool':
+                return 'false'
+            return '0'
+        elif isinstance(type_obj, StringType):
+            return '""'
+        elif isinstance(type_obj, BytesType):
+            return 'nil'
+        elif isinstance(type_obj, (ArrayType, FixedArrayType)):
+            return f'{TemplateEngine._go_type(type_obj)}{{}}'
+        elif isinstance(type_obj, (StructType, EnumType)):
+            return f'{type_obj.name}{{}}'
+        return '0'
+
+    @staticmethod
+    def _go_type_with_namespace(type_obj, namespace_prefix: str) -> str:
+        from ...schema.ast import PrimitiveType, StringType, BytesType, ArrayType, FixedArrayType, StructType, EnumType
+
+        if isinstance(type_obj, (PrimitiveType, StringType, BytesType)):
+            return TemplateEngine._go_type(type_obj)
+        elif isinstance(type_obj, ArrayType):
+            return f'[]{TemplateEngine._go_type_with_namespace(type_obj.element_type, namespace_prefix)}'
+        elif isinstance(type_obj, FixedArrayType):
+            return f'[{type_obj.size}]{TemplateEngine._go_type_with_namespace(type_obj.element_type, namespace_prefix)}'
+        elif isinstance(type_obj, (StructType, EnumType)):
+            type_name_parts = type_obj.name.split('_')
+            pascal_name = ''.join(word[0].upper() + word[1:] if word else '' for word in type_name_parts)
+            if namespace_prefix:
+                return f'{namespace_prefix}{pascal_name}'
+            return pascal_name
+        return TemplateEngine._go_type(type_obj)
+
+    @staticmethod
+    def _go_read_expr(type_obj) -> str:
+        from ...schema.ast import PrimitiveType
+
+        if isinstance(type_obj, PrimitiveType):
+            if type_obj.name == 'bool':
+                return 'readBool(r)'
+            go_type = TemplateEngine._go_type(type_obj)
+            return f'readPrimitive[{go_type}](r)'
+        return 'readPrimitive[uint8](r)'
+
+    @staticmethod
+    def _go_write_expr(type_obj, var_name: str) -> str:
+        from ...schema.ast import PrimitiveType
+
+        if isinstance(type_obj, PrimitiveType):
+            if type_obj.name == 'bool':
+                return f'writeBool(w, {var_name})'
+            return f'writePrimitive(w, {var_name})'
+        return f'writePrimitive(w, {var_name})'
+
+    @staticmethod
+    def _go_enum_backing_type_static(type_obj) -> str:
+        if hasattr(type_obj, 'backing_type'):
+            return TemplateEngine._go_type(type_obj.backing_type)
+        return 'uint8'
+
+    @staticmethod
+    def _go_enum_backing_type(type_obj, schema) -> str:
+        if hasattr(type_obj, 'backing_type'):
+            return TemplateEngine._go_type(type_obj.backing_type)
+        if schema and hasattr(type_obj, 'name'):
+            enum_def = schema.get_enum(type_obj.name)
+            if enum_def:
+                return TemplateEngine._go_type(enum_def.backing_type)
+        return 'uint8'

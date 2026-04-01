@@ -74,11 +74,11 @@
 {% endif %}
             },
 {% elif field.type.__class__.__name__ == 'StructType' %}
-            {{ field.name }}: {{ pascal_namespace }}_{{ field.type.name | replace('_', ' ') | title | replace(' ', '') }}::from_reader(reader)?,
+            {{ field.name }}: {{ pascal_namespace }}{{ field.type.name | pascal_case }}::from_reader(reader)?,
 {% elif field.type.__class__.__name__ == 'EnumType' %}
             {{ field.name }}: {
                 let value = {{ field.type | rust_enum_backing_read }};
-                {{ pascal_namespace }}_{{ field.type.name | replace('_', ' ') | title | replace(' ', '') }}::from_{{ field.type | rust_enum_backing_type }}(value).ok_or({{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Error::InvalidData)?
+                {{ pascal_namespace }}{{ field.type.name | pascal_case }}::from_{{ field.type | rust_enum_backing_type }}(value).ok_or({{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Error::InvalidData)?
             },
 {% else %}
             {{ field.name }}: Default::default(), // TODO: Unsupported type

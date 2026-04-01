@@ -148,7 +148,7 @@ class TestTypeScriptEndToEnd:
         
         # Create test main.ts
         main_ts = '''
-import { Player } from './picomsg-generated';
+import { GamePlayer as Player } from './picomsg-generated';
 
 console.log("Testing basic TypeScript binary generation...");
 
@@ -289,7 +289,7 @@ console.log("All tests passed!");
         files = generator.generate()
         
         main_ts = '''
-import { Scene, GameObject, Transform, Vector3 } from './picomsg-generated';
+import { ComplexScene as Scene, ComplexGameObject as GameObject, ComplexTransform as Transform, ComplexVector3 as Vector3 } from './picomsg-generated';
 
 console.log("Testing complex TypeScript structures...");
 
@@ -299,7 +299,7 @@ const scene = new Scene({
     camera_position: new Vector3({ x: 0.0, y: 5.0, z: -10.0 }),
     objects: [
         new GameObject({
-            id: 1,
+            id: 1n,
             name: "Player",
             transform: new Transform({
                 position: new Vector3({ x: 0.0, y: 1.0, z: 0.0 }),
@@ -309,7 +309,7 @@ const scene = new Scene({
             tags: ["player", "controllable"]
         }),
         new GameObject({
-            id: 2,
+            id: 2n,
             name: "Enemy",
             transform: new Transform({
                 position: new Vector3({ x: 10.0, y: 0.0, z: 5.0 }),
@@ -321,7 +321,7 @@ const scene = new Scene({
     ]
 });
 
-console.log("Created scene:", JSON.stringify(scene.toJSON(), null, 2));
+console.log("Created scene:", JSON.stringify(scene.toJSON(), (_, v) => typeof v === 'bigint' ? v.toString() : v, 2));
 
 // Test serialization
 const bytes = scene.toBytes();
@@ -424,7 +424,7 @@ console.log("Complex structure test passed!");
         files = generator.generate()
         
         main_ts = '''
-import { Config } from './picomsg-generated';
+import { TestConfig as Config } from './picomsg-generated';
 
 console.log("Testing TypeScript static factory methods...");
 
@@ -513,7 +513,7 @@ console.log("All tests passed!");
         
         # This should compile successfully
         main_ts = '''
-import { TypedData } from './picomsg-generated';
+import { TypesTypedData as TypedData } from './picomsg-generated';
 
 console.log("Testing TypeScript type safety...");
 
@@ -598,7 +598,7 @@ console.log("All tests passed!");
         files = generator.generate()
         
         main_ts = '''
-import { Dataset, DataPoint } from './picomsg-generated';
+import { PerfDataset as Dataset, PerfDataPoint as DataPoint } from './picomsg-generated';
 
 console.log("Testing TypeScript performance...");
 
@@ -606,7 +606,7 @@ console.log("Testing TypeScript performance...");
 const points: DataPoint[] = [];
 for (let i = 0; i < 100; i++) {
     points.push(new DataPoint({
-        timestamp: Date.now() + i,
+        timestamp: BigInt(Date.now()) + BigInt(i),
         value: Math.random() * 1000,
         label: `point_${i}`
     }));

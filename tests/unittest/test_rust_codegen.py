@@ -56,7 +56,7 @@ def test_rust_generator_primitives():
     schema = Schema(enums=[], 
         namespace=None,
         structs=[
-            Struct("AllTypes", [
+            Struct("all_types", [
                 Field("u8_field", PrimitiveType("u8")),
                 Field("u16_field", PrimitiveType("u16")),
                 Field("u32_field", PrimitiveType("u32")),
@@ -77,7 +77,7 @@ def test_rust_generator_primitives():
     content = files["picomsg_generated.rs"]
     
     # Check struct definition
-    assert "pub struct AllTypes {" in content
+    assert "pub struct AllTypes {" in content  # all_types -> AllTypes via title
     assert "pub u8_field: u8," in content
     assert "pub f64_field: f64," in content
     

@@ -39,7 +39,7 @@ class PythonCodeGenerator(CodeGenerator):
         # Convert namespace to PascalCase prefix with trailing underscore
         parts = self.schema.namespace.name.split('.')
         prefix = ''.join(part.capitalize() for part in parts)
-        return prefix + '_' if prefix else ''
+        return prefix if prefix else ''
     
     def _sanitize_identifier(self, name: str) -> str:
         """Sanitize identifier for Python."""

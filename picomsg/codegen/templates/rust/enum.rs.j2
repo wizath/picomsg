@@ -1,18 +1,18 @@
 /// Enum: {{ enum.name }}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[repr({{ enum.backing_type | rust_type }})]
-pub enum {{ pascal_namespace }}_{{ enum.name | replace('_', ' ') | title | replace(' ', '') }} {
+pub enum {{ pascal_namespace }}{{ enum.name | pascal_case }} {
 {% for value in enum.values %}
-    {{ value.name | replace('_', ' ') | title | replace(' ', '') }} = {{ value.value }},
+    {{ value.name | pascal_case }} = {{ value.value }},
 {% endfor %}
 }
 
-impl {{ pascal_namespace }}_{{ enum.name | replace('_', ' ') | title | replace(' ', '') }} {
+impl {{ pascal_namespace }}{{ enum.name | pascal_case }} {
     /// Convert from {{ enum.backing_type | rust_type }} value
     pub fn from_{{ enum.backing_type | rust_type }}(value: {{ enum.backing_type | rust_type }}) -> Option<Self> {
         match value {
 {% for value in enum.values %}
-            {{ value.value }} => Some(Self::{{ value.name | replace('_', ' ') | title | replace(' ', '') }}),
+            {{ value.value }} => Some(Self::{{ value.name | pascal_case }}),
 {% endfor %}
             _ => None,
         }

@@ -1,12 +1,12 @@
 /// Struct: {{ struct.name }}
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct {{ pascal_namespace }}_{{ struct.name | replace('_', ' ') | title | replace(' ', '') }} {
+pub struct {{ pascal_namespace }}{{ struct.name | pascal_case }} {
 {% for field in struct.fields %}
     pub {{ field.name }}: {{ field.type | rust_type_with_namespace(pascal_namespace) }},
 {% endfor %}
 }
 
-impl {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Serialize for {{ pascal_namespace }}_{{ struct.name | replace('_', ' ') | title | replace(' ', '') }} {
+impl {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Serialize for {{ pascal_namespace }}{{ struct.name | pascal_case }} {
     fn from_bytes(data: &[u8]) -> {{ pascal_namespace if pascal_namespace else 'PicoMsg' }}Result<Self> {
         let mut cursor = std::io::Cursor::new(data);
         Self::from_reader(&mut cursor)

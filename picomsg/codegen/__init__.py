@@ -9,6 +9,7 @@ from .python import PythonCodeGenerator
 from .rust_json import RustJsonCodeGenerator
 from .python_json import PythonJsonCodeGenerator
 from .typescript import TypeScriptCodeGenerator
+from .go import GoCodeGenerator
 
 __all__ = [
     "CodeGenerator",
@@ -18,4 +19,5 @@ __all__ = [
     "RustJsonCodeGenerator",
     "PythonJsonCodeGenerator",
     "TypeScriptCodeGenerator",
+    "GoCodeGenerator",
 ] 

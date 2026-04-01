@@ -1,0 +1,90 @@
+{% if field.type.__class__.__name__ == 'PrimitiveType' %}
+{% if field.type.name == 'bool' %}
+	if err := writeBool(w, s.{{ field.name | pascal_case }}); err != nil {
+		return err
+	}
+{% else %}
+	if err := writePrimitive(w, s.{{ field.name | pascal_case }}); err != nil {
+		return err
+	}
+{% endif %}
+{% elif field.type.__class__.__name__ == 'StringType' %}
+	if err := writeString(w, s.{{ field.name | pascal_case }}); err != nil {
+		return err
+	}
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+	if err := writeBytes(w, s.{{ field.name | pascal_case }}); err != nil {
+		return err
+	}
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+	if err := writePrimitive(w, uint16(len(s.{{ field.name | pascal_case }}))); err != nil {
+		return err
+	}
+	for _, item := range s.{{ field.name | pascal_case }} {
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+{% if field.type.element_type.name == 'bool' %}
+		if err := writeBool(w, item); err != nil {
+			return err
+		}
+{% else %}
+		if err := writePrimitive(w, item); err != nil {
+			return err
+		}
+{% endif %}
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+		if err := writeString(w, item); err != nil {
+			return err
+		}
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+		if err := writeBytes(w, item); err != nil {
+			return err
+		}
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+		if err := item.WriteTo(w); err != nil {
+			return err
+		}
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+		if err := writePrimitive(w, {{ field.type.element_type | go_enum_backing_type }}(item)); err != nil {
+			return err
+		}
+{% endif %}
+	}
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+	for _, item := range s.{{ field.name | pascal_case }} {
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+{% if field.type.element_type.name == 'bool' %}
+		if err := writeBool(w, item); err != nil {
+			return err
+		}
+{% else %}
+		if err := writePrimitive(w, item); err != nil {
+			return err
+		}
+{% endif %}
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+		if err := writeString(w, item); err != nil {
+			return err
+		}
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+		if err := writeBytes(w, item); err != nil {
+			return err
+		}
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+		if err := item.WriteTo(w); err != nil {
+			return err
+		}
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+		if err := writePrimitive(w, {{ field.type.element_type | go_enum_backing_type }}(item)); err != nil {
+			return err
+		}
+{% endif %}
+	}
+{% elif field.type.__class__.__name__ == 'StructType' %}
+	if err := s.{{ field.name | pascal_case }}.WriteTo(w); err != nil {
+		return err
+	}
+{% elif field.type.__class__.__name__ == 'EnumType' %}
+	if err := writePrimitive(w, {{ field.type | go_enum_backing_type }}(s.{{ field.name | pascal_case }})); err != nil {
+		return err
+	}
+{% endif %}

@@ -1,0 +1,30 @@
+// {{ enum.name }} enum
+type {{ namespace_prefix }}{{ enum.name | pascal_case }} {{ enum.backing_type | go_type }}
+
+const (
+{% for value in enum.values %}
+	{{ namespace_prefix }}{{ enum.name | pascal_case }}{{ value.name | pascal_case }} {{ namespace_prefix }}{{ enum.name | pascal_case }} = {{ value.value }}
+{% endfor %}
+)
+
+func {{ namespace_prefix }}{{ enum.name | pascal_case }}FromValue(v {{ enum.backing_type | go_type }}) ({{ namespace_prefix }}{{ enum.name | pascal_case }}, error) {
+	switch {{ namespace_prefix }}{{ enum.name | pascal_case }}(v) {
+{% for value in enum.values %}
+	case {{ namespace_prefix }}{{ enum.name | pascal_case }}{{ value.name | pascal_case }}:
+		return {{ namespace_prefix }}{{ enum.name | pascal_case }}{{ value.name | pascal_case }}, nil
+{% endfor %}
+	default:
+		return 0, fmt.Errorf("picomsg: invalid {{ enum.name }} value: %v", v)
+	}
+}
+
+func (e {{ namespace_prefix }}{{ enum.name | pascal_case }}) String() string {
+	switch e {
+{% for value in enum.values %}
+	case {{ namespace_prefix }}{{ enum.name | pascal_case }}{{ value.name | pascal_case }}:
+		return "{{ value.name }}"
+{% endfor %}
+	default:
+		return fmt.Sprintf("{{ enum.name }}(%d)", e)
+	}
+}

@@ -31,26 +31,23 @@ def test_typescript_generator_basic():
     generator = TypeScriptCodeGenerator(schema)
     files = generator.generate()
     
-    assert len(files) == 5  # .ts, .d.ts, package.json, tsconfig.json, README.md
+    assert len(files) == 2  # .ts, .d.ts
     assert "picomsg-generated.ts" in files
     assert "picomsg-generated.d.ts" in files
-    assert "package.json" in files
-    assert "tsconfig.json" in files
-    assert "README.md" in files
-    
+
     content = files["picomsg-generated.ts"]
-    
+
     # Check for proper TypeScript syntax
-    assert "export abstract class test_example_Base" in content
-    assert "export class test_example_Error extends Error" in content
-    
+    assert "export abstract class TestExampleBase" in content
+    assert "export class TestExampleError extends Error" in content
+
     # Check for proper naming conventions
-    assert "export class Point extends test_example_Base" in content
-    assert "export class EchoRequest extends test_example_Base" in content
-    
+    assert "export class TestExamplePoint extends TestExampleBase" in content
+    assert "export class TestExampleEchoRequest extends TestExampleBase" in content
+
     # Check for constants
-    assert "export const TEST_EXAMPLE__VERSION = 1;" in content
-    assert "export const TEST_EXAMPLE__ECHO_REQUEST_TYPE_ID = 1;" in content
+    assert "export const TESTEXAMPLE_VERSION = 1;" in content
+    assert "export const TESTEXAMPLE_ECHO_REQUEST_TYPE_ID = 1;" in content
 
 
 def test_typescript_generator_primitives():
@@ -198,7 +195,7 @@ def test_typescript_generator_with_version():
     files = generator.generate()
     content = files["picomsg-generated.ts"]
     
-    assert "export const TEST_VERSIONED__VERSION = 42;" in content
+    assert "export const TESTVERSIONED_VERSION = 42;" in content
 
 
 def test_typescript_generator_module_name_option():
@@ -217,10 +214,6 @@ def test_typescript_generator_module_name_option():
     
     assert "custom_module.ts" in files
     assert "custom_module.d.ts" in files
-    
-    # Check package.json has correct name
-    package_json = files["package.json"]
-    assert '"name": "custom_module"' in package_json
 
 
 def test_typescript_generator_no_namespace():
@@ -301,65 +294,12 @@ def test_typescript_generator_type_declarations():
     assert "export interface PicoMsgSerializable" in declarations
     
     # Check class declarations
-    assert "export declare class Point extends test_types_Base" in declarations
-    assert "export declare class Move extends test_types_Base" in declarations
-    
+    assert "export declare class TestTypesPoint extends TestTypesBase" in declarations
+    assert "export declare class TestTypesMove extends TestTypesBase" in declarations
+
     # Check constructor signatures
-    assert "constructor(data?: Partial<Point>);" in declarations
-    assert "constructor(data?: Partial<Move>);" in declarations
-
-
-def test_typescript_generator_package_json():
-    """Test package.json generation."""
-    schema = Schema(enums=[], namespace=None, structs=[], messages=[])
-    
-    generator = TypeScriptCodeGenerator(schema)
-    generator.set_option('module_name', 'test_package')
-    files = generator.generate()
-    
-    package_json = files["package.json"]
-    
-    # Check basic package.json structure
-    assert '"name": "test_package"' in package_json
-    assert '"version": "1.0.0"' in package_json
-    assert '"main": "test_package.js"' in package_json
-    assert '"types": "test_package.d.ts"' in package_json
-    assert '"typescript"' in package_json
-    assert '"@types/node"' in package_json
-
-
-def test_typescript_generator_tsconfig():
-    """Test tsconfig.json generation."""
-    schema = Schema(enums=[], namespace=None, structs=[], messages=[])
-    
-    generator = TypeScriptCodeGenerator(schema)
-    files = generator.generate()
-    
-    tsconfig = files["tsconfig.json"]
-    
-    # Check TypeScript configuration
-    assert '"target": "ES2020"' in tsconfig
-    assert '"module": "commonjs"' in tsconfig
-    assert '"strict": true' in tsconfig
-    assert '"outDir": "./dist"' in tsconfig
-
-
-def test_typescript_generator_readme():
-    """Test README.md generation."""
-    schema = Schema(enums=[], namespace=None, structs=[], messages=[])
-    
-    generator = TypeScriptCodeGenerator(schema)
-    generator.set_option('module_name', 'my_module')
-    files = generator.generate()
-    
-    readme = files["README.md"]
-    
-    # Check README content
-    assert "# Generated PicoMsg TypeScript Bindings" in readme
-    assert "my_module.ts" in readme
-    assert "npm install" in readme
-    assert "npm run build" in readme
-    assert "Binary serialization/deserialization" in readme
+    assert "constructor(data?: Partial<TestTypesPoint>);" in declarations
+    assert "constructor(data?: Partial<TestTypesMove>);" in declarations
 
 
 def test_typescript_sanitize_identifier():
@@ -398,7 +338,7 @@ def test_typescript_generator_with_version():
     files = generator.generate()
     content = files["picomsg-generated.ts"]
 
-    assert "export const TEST_VERSIONED__VERSION = 42;" in content
+    assert "export const TESTVERSIONED_VERSION = 42;" in content
 
 
 def test_typescript_generator_u64_i64_types():

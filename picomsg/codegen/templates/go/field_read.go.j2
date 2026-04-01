@@ -1,0 +1,126 @@
+{% if field.type.__class__.__name__ == 'PrimitiveType' %}
+{% if field.type.name == 'bool' %}
+	s.{{ field.name | pascal_case }}, err = readBool(r)
+	if err != nil {
+		return err
+	}
+{% else %}
+	s.{{ field.name | pascal_case }}, err = readPrimitive[{{ field.type | go_type }}](r)
+	if err != nil {
+		return err
+	}
+{% endif %}
+{% elif field.type.__class__.__name__ == 'StringType' %}
+	s.{{ field.name | pascal_case }}, err = readString(r)
+	if err != nil {
+		return err
+	}
+{% elif field.type.__class__.__name__ == 'BytesType' %}
+	s.{{ field.name | pascal_case }}, err = readBytes(r)
+	if err != nil {
+		return err
+	}
+{% elif field.type.__class__.__name__ == 'ArrayType' %}
+	{
+		count, err := readPrimitive[uint16](r)
+		if err != nil {
+			return err
+		}
+		s.{{ field.name | pascal_case }} = make({{ field.type | go_type_with_namespace(namespace_prefix) }}, count)
+		for i := uint16(0); i < count; i++ {
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+{% if field.type.element_type.name == 'bool' %}
+			s.{{ field.name | pascal_case }}[i], err = readBool(r)
+{% else %}
+			s.{{ field.name | pascal_case }}[i], err = readPrimitive[{{ field.type.element_type | go_type }}](r)
+{% endif %}
+			if err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+			s.{{ field.name | pascal_case }}[i], err = readString(r)
+			if err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+			s.{{ field.name | pascal_case }}[i], err = readBytes(r)
+			if err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+			if err := s.{{ field.name | pascal_case }}[i].ReadFrom(r); err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+			{
+				v, err := readPrimitive[{{ field.type.element_type | go_enum_backing_type }}](r)
+				if err != nil {
+					return err
+				}
+				ev, err := {{ field.type.element_type | go_type_with_namespace(namespace_prefix) }}FromValue(v)
+				if err != nil {
+					return err
+				}
+				s.{{ field.name | pascal_case }}[i] = ev
+			}
+{% endif %}
+		}
+	}
+{% elif field.type.__class__.__name__ == 'FixedArrayType' %}
+	{
+		for i := 0; i < {{ field.type.size }}; i++ {
+{% if field.type.element_type.__class__.__name__ == 'PrimitiveType' %}
+{% if field.type.element_type.name == 'bool' %}
+			s.{{ field.name | pascal_case }}[i], err = readBool(r)
+{% else %}
+			s.{{ field.name | pascal_case }}[i], err = readPrimitive[{{ field.type.element_type | go_type }}](r)
+{% endif %}
+			if err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'StringType' %}
+			s.{{ field.name | pascal_case }}[i], err = readString(r)
+			if err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'BytesType' %}
+			s.{{ field.name | pascal_case }}[i], err = readBytes(r)
+			if err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'StructType' %}
+			if err := s.{{ field.name | pascal_case }}[i].ReadFrom(r); err != nil {
+				return err
+			}
+{% elif field.type.element_type.__class__.__name__ == 'EnumType' %}
+			{
+				v, err := readPrimitive[{{ field.type.element_type | go_enum_backing_type }}](r)
+				if err != nil {
+					return err
+				}
+				ev, err := {{ field.type.element_type | go_type_with_namespace(namespace_prefix) }}FromValue(v)
+				if err != nil {
+					return err
+				}
+				s.{{ field.name | pascal_case }}[i] = ev
+			}
+{% endif %}
+		}
+	}
+{% elif field.type.__class__.__name__ == 'StructType' %}
+	if err := s.{{ field.name | pascal_case }}.ReadFrom(r); err != nil {
+		return err
+	}
+{% elif field.type.__class__.__name__ == 'EnumType' %}
+	{
+		v, err := readPrimitive[{{ field.type | go_enum_backing_type }}](r)
+		if err != nil {
+			return err
+		}
+		ev, err := {{ field.type | go_type_with_namespace(namespace_prefix) }}FromValue(v)
+		if err != nil {
+			return err
+		}
+		s.{{ field.name | pascal_case }} = ev
+	}
+{% endif %}
