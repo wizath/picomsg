@@ -108,7 +108,7 @@ class TypeScriptCodeGenerator(CodeGenerator):
         for struct in self.schema.structs:
             lines.extend([
                 f'export declare class {namespace_prefix}{struct.name} extends {base_name} {{',
-                *[f'  {field.name}: {self.template_engine._ts_type(field.type)};' for field in struct.fields],
+                *[f'  {field.name}: {self.template_engine._ts_type_with_schema(field.type, self.schema)};' for field in struct.fields],
                 f'  constructor(data?: Partial<{namespace_prefix}{struct.name}>);',
                 '}',
                 '',
@@ -118,7 +118,7 @@ class TypeScriptCodeGenerator(CodeGenerator):
         for message in self.schema.messages:
             lines.extend([
                 f'export declare class {namespace_prefix}{message.name} extends {base_name} {{',
-                *[f'  {field.name}: {self.template_engine._ts_type(field.type)};' for field in message.fields],
+                *[f'  {field.name}: {self.template_engine._ts_type_with_schema(field.type, self.schema)};' for field in message.fields],
                 f'  constructor(data?: Partial<{namespace_prefix}{message.name}>);',
                 '}',
                 '',

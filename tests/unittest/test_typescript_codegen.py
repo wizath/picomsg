@@ -443,6 +443,45 @@ def test_typescript_generator_u64_declaration_file():
     assert "u32_field: number;" in declarations
 
 
+def test_typescript_declaration_struct_field_namespace_prefix():
+    """Test that .d.ts file uses namespace-prefixed names for struct/enum field types."""
+    schema = Schema(
+        enums=[
+            Enum("Status", PrimitiveType("u8"), [
+                EnumValue("OK", 0),
+                EnumValue("ERR", 1),
+            ])
+        ],
+        namespace=Namespace("lamp.api.v1"),
+        structs=[
+            Struct("ApiHeader", [
+                Field("version", PrimitiveType("u8")),
+            ]),
+            Struct("Packet", [
+                Field("header", StructType("ApiHeader")),
+                Field("status", EnumType("Status")),
+            ])
+        ],
+        messages=[
+            Message("SendCommand", [
+                Field("header", StructType("ApiHeader")),
+                Field("payload_size", PrimitiveType("u32")),
+            ])
+        ]
+    )
+
+    generator = TypeScriptCodeGenerator(schema)
+    files = generator.generate()
+    declarations = files["picomsg-generated.d.ts"]
+
+    assert "header: LampApiV1ApiHeader;" in declarations
+    assert "status: LampApiV1Status;" in declarations
+
+    ts_content = files["picomsg-generated.ts"]
+    assert "header: LampApiV1ApiHeader" in ts_content
+    assert "status: LampApiV1Status" in ts_content
+
+
 def test_typescript_generator_u64_array():
     """Test TypeScript generation with arrays of u64/i64."""
     schema = Schema(enums=[],
